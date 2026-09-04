@@ -1,3 +1,4 @@
+import sys
 from collections import deque
 
 from .models import PageResult, LinkResult
@@ -366,8 +367,9 @@ class WebsiteCrawler:
             ):
 
                 print(
-                    f"[ROBOTS BLOCKED] "
-                    f"{current_url}"
+                   f"[ROBOTS BLOCKED] "
+                   f"{current_url}",
+                   file=sys.stderr
                 )
 
                 stats[
@@ -391,8 +393,9 @@ class WebsiteCrawler:
             print(
                 f"[CRAWL] "
                 f"depth={depth} "
-                f"url={current_url}"
-            )
+                f"url={current_url}",
+                file=sys.stderr
+                )
 
             # --------------------------------------------------
             # FETCH PAGE
