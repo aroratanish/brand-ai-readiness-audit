@@ -1,0 +1,24 @@
+{
+  "name": "brand-ai-readiness-audit",
+  "skills": [
+    {
+      "name": "audit-orchestrator",
+      "path": "skills/audit_orchestrator/",
+      "module": "skills.audit_orchestrator",
+      "status": "implemented",
+      "description": "Runs the P1 audit pipeline and produces validated, deduplicated findings and reports."
+    },
+    {
+      "name": "freshness-corroboration",
+      "path": "skills/freshness_corroboration/",
+      "status": "placeholder",
+      "description": "P3 freshness and information trust skill placeholder; implementation is deferred."
+    },
+    {
+      "name": "engagement-audit",
+      "path": "skills/engagement_audit/",
+      "status": "placeholder",
+      "description": "P3 user and AI engagement skill placeholder; implementation is deferred."
+    }
+  ]
+}

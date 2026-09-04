@@ -3,6 +3,7 @@ import sys
 from dataclasses import asdict
 
 from .crawler import WebsiteCrawler
+from .finding_adapter import findings_for_page
 
 
 def run_audit(url: str):
@@ -19,6 +20,11 @@ def run_audit(url: str):
         "pages": [
             asdict(page)
             for page in pages
+        ],
+        "findings": [
+            finding
+            for page in pages
+            for finding in findings_for_page(page)
         ],
     }
 

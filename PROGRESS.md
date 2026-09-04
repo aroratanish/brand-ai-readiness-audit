@@ -1,0 +1,87 @@
+# Repository Progress
+
+**Date:** 2026-09-03  
+**Overall status:** P2 crawler foundation and P1 contracts, adapter, orchestration, deduplication, and reporting are complete.
+
+## Completed
+
+- Added a `WebsiteCrawler` with configurable maximum page count and crawl depth.
+- Added URL normalization, absolute URL resolution, HTTP/HTTPS checks, and same-domain detection.
+- Added HTTP fetching with a 10-second timeout, redirects, response metadata, and a read-only user agent.
+- Added HTML parsing for:
+  - Page title
+  - Meta description
+  - `h1` and `h2` headings
+  - Canonical URL
+  - Internal and external links
+  - JSON-LD structured data, including malformed JSON capture
+- Added `PageResult` as the shared result model.
+- Added a command-line audit entry point that serializes crawl results as JSON.
+- Added the canonical shared finding schema in `shared/finding_schema.md`.
+- Added severity definitions and assignment guidance in `shared/severity_rules.md`.
+- Added placeholder `SKILL.md` files for the audit orchestrator, freshness corroboration, and engagement audit skills.
+- Added a reusable PageResult-to-Finding adapter for missing meta descriptions, JSON-LD, and canonicals.
+- Integrated adapter findings into the existing audit CLI output.
+- Added centralized severity normalization and validation in `shared/severity_policy.py`.
+- Added focused severity policy tests in `tests/test_severity_policy.py`.
+- Added the P1 `audit_site(url)` orchestrator using the real P2 crawler and finding adapter.
+- Added empty freshness and engagement provider stubs with centralized finding validation.
+- Added focused orchestrator tests covering P2 findings, empty P3 stubs, invalid severities, and predictable ordering.
+- Added deterministic finding deduplication by URL, category, and conservative normalized title similarity.
+- Added focused deduplication tests, including cross-source provenance preservation.
+- Added the canonical report schema in `shared/report_schema.md`.
+- Added `build_report` and `audit_site_report` with UTC timestamps and calculated severity summaries.
+- Added focused report-builder tests for counts, URLs, timestamps, preservation, and zero-count severities.
+- Confirmed the Python skill sources compile successfully with the configured workspace Python environment.
+
+## Current Structure
+
+```text
+skills/
+  crawl_render_audit/
+    scripts/
+      audit.py          # CLI entry point and audit orchestration
+      crawler.py        # Breadth-first crawl flow
+      html_parser.py    # Metadata, links, headings, and JSON-LD extraction
+      http_checker.py   # HTTP requests and redirect handling
+      models.py         # PageResult dataclass
+      url_utils.py      # URL helpers
+  audit_orchestrator/
+    __init__.py         # Public audit_site interface
+    orchestrator.py     # P1 finding orchestration pipeline
+    deduplication.py    # P1 deterministic finding deduplication
+    report_builder.py   # P1 canonical report builder
+    SKILL.md            # Interface and limitations
+  freshness_corroboration/
+    SKILL.md            # P3 placeholder; implementation deferred
+  engagement_audit/
+    SKILL.md            # P3 placeholder; implementation deferred
+shared/
+  finding_schema.md     # Canonical finding contract
+  report_schema.md      # Canonical report contract
+  severity_rules.md     # Severity definitions and guidance
+  severity_policy.py    # Reusable severity normalization and validation
+tests/
+  test_severity_policy.py # Severity policy and adapter tests
+  test_audit_orchestrator.py # Orchestration and integration tests
+  test_finding_deduplication.py # Deduplication behavior tests
+  test_report_builder.py # Report builder tests
+```
+
+## Known Gaps
+
+- No project README, dependency manifest, packaging configuration, or CI workflow is present.
+- The CLI usage text references `crawl-render-audit`, while the actual Python package directory is `crawl_render_audit`; the documented invocation should use the underscore-based module path.
+- Known limitation: the crawler currently treats every successful HTTP response as fetch success, including HTTP error status codes. This is intentionally not fixed yet.
+- Scoring, persisted audit output, and richer report presentation are not implemented yet.
+- Crawl behavior does not yet cover robots.txt, sitemap discovery, rate limiting, retries, authentication, or JavaScript-rendered pages.
+
+## Recommended Next Steps
+
+1. Add focused unit tests for URL normalization, link classification, JSON-LD parsing, redirects, failures, page limits, and depth limits.
+2. Add a dependency file and project README with setup and CLI instructions.
+3. Correct the CLI usage text to `python -m skills.crawl_render_audit.scripts.audit https://example.com`.
+4. Decide how HTTP 4xx/5xx responses should be represented in audit results.
+5. Implement the freshness corroboration and engagement audit skills in P3.
+6. Add optional rendering support for sites whose meaningful content is generated by JavaScript.
+7. Add scoring when the scoring requirements are defined.
