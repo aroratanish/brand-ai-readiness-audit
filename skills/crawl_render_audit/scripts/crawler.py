@@ -11,6 +11,11 @@ from .html_parser import parse_html
 from .robots_checker import RobotsPolicy
 from .link_checker import LinkChecker
 from .sitemap_checker import SitemapChecker
+from .renderer import Renderer
+from .render_diff_analyzer import RenderDiffAnalyzer
+from .metadata_analyzer import MetadataAnalyzer
+from .canonical_analyzer import CanonicalAnalyzer
+from .jsonld_analyzer import JSONLDAnalyzer
 
 
 class WebsiteCrawler:
@@ -28,6 +33,24 @@ class WebsiteCrawler:
 
         self.link_checker = LinkChecker(
             self.client
+        )
+
+        self.renderer = Renderer()
+
+        self.render_diff_analyzer = (
+            RenderDiffAnalyzer()
+        )
+
+        self.metadata_analyzer = (
+            MetadataAnalyzer()
+        )
+
+        self.canonical_analyzer = (
+            CanonicalAnalyzer()
+        )
+
+        self.jsonld_analyzer = (
+            JSONLDAnalyzer()
         )
 
     def crawl(
@@ -264,6 +287,7 @@ class WebsiteCrawler:
                 if not robots.can_fetch(
                     sitemap_page_url
                 ):
+
                     stats[
                         "pages_skipped_robots"
                     ] += 1
@@ -517,6 +541,138 @@ class WebsiteCrawler:
             page.json_ld = parsed[
                 "json_ld"
             ]
+
+            # --------------------------------------------------
+            # DETERMINISTIC TECHNICAL ANALYSIS
+            # --------------------------------------------------
+
+            page.technical_evidence = {}
+
+            # --------------------------------------------------
+            # METADATA ANALYSIS
+            # --------------------------------------------------
+
+            page.technical_evidence[
+                "metadata"
+            ] = self.metadata_analyzer.analyze(
+                page.title,
+                page.meta_description,
+                page.h1,
+                page.h2,
+            )
+
+            # --------------------------------------------------
+            # CANONICAL ANALYSIS
+            # --------------------------------------------------
+
+            page.technical_evidence[
+                "canonical"
+            ] = self.canonical_analyzer.analyze(
+                page.final_url or page.url,
+                page.canonical,
+            )
+
+            # --------------------------------------------------
+            # JSON-LD ANALYSIS
+            # --------------------------------------------------
+
+            page.technical_evidence[
+                "json_ld"
+            ] = self.jsonld_analyzer.analyze(
+                page.json_ld
+            )
+
+            # --------------------------------------------------
+            # BROWSER RENDERING
+            # --------------------------------------------------
+
+            render_url = (
+                page.final_url
+                or page.url
+            )
+
+            render_result = (
+                self.renderer.render(
+                    render_url
+                )
+            )
+
+            # --------------------------------------------------
+            # RENDERING FAILED
+            # --------------------------------------------------
+
+            if render_result.error:
+
+                page.errors.append(
+                    f"Renderer: "
+                    f"{render_result.error}"
+                )
+
+                page.technical_evidence[
+                    "render"
+                ] = {
+                    "status": "error",
+
+                    "evidence": {
+                        "url": render_url,
+                        "error": (
+                            render_result.error
+                        ),
+                    },
+                }
+
+            # --------------------------------------------------
+            # RENDERING SUCCESSFUL
+            # --------------------------------------------------
+
+            else:
+
+                page.rendered_html = (
+                    render_result.rendered_html
+                )
+
+                page.technical_evidence[
+                    "render"
+                ] = {
+
+                    "status": "success",
+
+                    "evidence": {
+                        "url": render_url,
+
+                        "final_url": (
+                            render_result.final_url
+                        ),
+
+                        "status_code": (
+                            render_result.status_code
+                        ),
+
+                        "rendered_title": (
+                            render_result.title
+                        ),
+
+                        "rendered_html_length": (
+                            len(
+                                render_result
+                                .rendered_html
+                            )
+                        ),
+                    },
+                }
+
+                # --------------------------------------------------
+                # RAW VS RENDERED ANALYSIS
+                # --------------------------------------------------
+
+                page.technical_evidence[
+                    "raw_vs_rendered"
+                ] = (
+                    self.render_diff_analyzer.analyze(
+                        page.raw_html,
+                        page.rendered_html,
+                    )
+                )
 
             # --------------------------------------------------
             # INTERNAL LINKS

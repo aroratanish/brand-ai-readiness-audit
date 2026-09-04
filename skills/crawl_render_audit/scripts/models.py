@@ -12,7 +12,9 @@ class LinkResult:
     final_url: Optional[str] = None
 
     redirected: bool = False
-    redirect_chain: list[str] = field(default_factory=list)
+    redirect_chain: list[str] = field(
+        default_factory=list
+    )
 
     content_type: str = ""
 
@@ -63,6 +65,10 @@ class PageResult:
 
     link_results: list[LinkResult] = field(
         default_factory=list
+    )
+
+    technical_evidence: dict = field(
+        default_factory=dict
     )
 
     errors: list[str] = field(
