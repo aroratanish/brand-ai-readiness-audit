@@ -4,7 +4,8 @@ from dataclasses import asdict
 
 from .crawler import WebsiteCrawler
 from .evidence_aggregator import TechnicalEvidenceAggregator
-from .llm_discoverability_analyzer import LLMDiscoverabilityAnalyzer
+from .cross_signal_analyzer import CrossSignalAnalyzer
+from .page_type_classifier import PageTypeClassifier
 
 
 def run_audit(url: str):
@@ -15,24 +16,23 @@ def run_audit(url: str):
 
     crawl_result = crawler.crawl(url)
 
-    pages = crawl_result["pages"]
-
     evidence_aggregator = TechnicalEvidenceAggregator()
 
     technical_evidence = evidence_aggregator.aggregate(
-        pages,
+        crawl_result["pages"],
         crawl_result,
     )
 
-    llm_analyzer = LLMDiscoverabilityAnalyzer()
+    cross_signal_analyzer = CrossSignalAnalyzer()
 
-    llm_discoverability = llm_analyzer.analyze_site(
-        url,
-        pages,
+    cross_signal_evidence = cross_signal_analyzer.analyze_site(
+        crawl_result["pages"]
     )
 
-    technical_evidence["llm_discoverability"] = (
-        llm_discoverability
+    page_type_classifier = PageTypeClassifier()
+
+    page_type_evidence = page_type_classifier.classify_site(
+        crawl_result["pages"]
     )
 
     result = {
@@ -41,12 +41,12 @@ def run_audit(url: str):
         "site": url,
 
         "summary": {
-            "pages_discovered": (
-                crawl_result["pages_discovered"]
-            ),
-            "pages_crawled": (
-                crawl_result["pages_crawled"]
-            ),
+            "pages_discovered": crawl_result[
+                "pages_discovered"
+            ],
+            "pages_crawled": crawl_result[
+                "pages_crawled"
+            ],
         },
 
         "robots": crawl_result["robots"],
@@ -55,9 +55,13 @@ def run_audit(url: str):
 
         "technical_evidence": technical_evidence,
 
+        "cross_signal_evidence": cross_signal_evidence,
+
+        "page_type_evidence": page_type_evidence,
+
         "pages": [
             asdict(page)
-            for page in pages
+            for page in crawl_result["pages"]
         ],
     }
 
@@ -65,11 +69,9 @@ def run_audit(url: str):
 
 
 if __name__ == "__main__":
-
     if len(sys.argv) < 2:
         print(
-            "Usage: "
-            "python -m "
+            "Usage: python -m "
             "skills.crawl_render_audit.scripts.audit "
             "https://example.com"
         )

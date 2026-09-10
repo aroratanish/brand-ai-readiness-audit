@@ -1,64 +1,54 @@
 class JSONLDAnalyzer:
+    """
+    Deterministic JSON-LD analyzer.
 
-    def analyze(
-        self,
-        json_ld: list[dict],
-    ):
+    Reports structure and validity of JSON-LD blocks.
+    It does not determine severity.
+    """
 
-        types = []
+    def analyze(self, data):
+        data = data or []
 
+        total_blocks = len(data)
         valid_blocks = 0
         invalid_blocks = 0
+        types = []
 
-        for block in json_ld:
+        for block in data:
+            if not isinstance(block, dict):
+                invalid_blocks += 1
+                continue
 
-            if not isinstance(
-                block,
-                dict
-            ):
-
+            if not block:
                 invalid_blocks += 1
                 continue
 
             valid_blocks += 1
 
-            block_type = block.get(
-                "@type"
-            )
+            block_type = block.get("@type")
 
-            if isinstance(
-                block_type,
-                list
-            ):
-
+            if isinstance(block_type, list):
                 types.extend(
-                    str(item)
+                    item
                     for item in block_type
+                    if isinstance(item, str)
                 )
+            elif isinstance(block_type, str):
+                types.append(block_type)
 
-            elif block_type:
-
-                types.append(
-                    str(block_type)
-                )
-
-        unique_types = sorted(
-            set(types)
-        )
+        if total_blocks == 0:
+            status = "missing"
+        else:
+            status = "present"
 
         return {
-            "check": "json_ld",
-            "status": (
-                "present"
-                if valid_blocks > 0
-                else "missing"
-            ),
+            "status": status,
             "evidence": {
-                "total_blocks": len(
-                    json_ld
-                ),
+                "total_blocks": total_blocks,
                 "valid_blocks": valid_blocks,
                 "invalid_blocks": invalid_blocks,
-                "types": unique_types,
+                "types": sorted(set(types)),
+                "source": "raw_html",
+                "confidence": "high",
             },
         }

@@ -1,134 +1,410 @@
-from html import unescape
+from difflib import SequenceMatcher
 from html.parser import HTMLParser
 import re
 
 
-class TextExtractor(HTMLParser):
+class VisibleContentParser(HTMLParser):
+    """
+    Extract visible text and headings from HTML.
+
+    Script, style, noscript and template content are ignored because
+    they are not directly visible page content.
+    """
+
+    IGNORED_TAGS = {
+        "script",
+        "style",
+        "noscript",
+        "template",
+        "svg",
+    }
+
+    HEADING_TAGS = {
+        "h1",
+        "h2",
+        "h3",
+    }
+
     def __init__(self):
         super().__init__()
-        self.parts = []
-        self.ignore_depth = 0
+
+        self.text_parts = []
+        self.headings = []
+
+        self._ignored_depth = 0
+        self._current_heading = None
+        self._current_heading_parts = []
 
     def handle_starttag(self, tag, attrs):
-        if tag.lower() in {"script", "style", "noscript", "template"}:
-            self.ignore_depth += 1
+        tag = tag.lower()
+
+        if tag in self.IGNORED_TAGS:
+            self._ignored_depth += 1
+            return
+
+        if self._ignored_depth:
+            return
+
+        if tag in self.HEADING_TAGS:
+            self._current_heading = tag
+            self._current_heading_parts = []
 
     def handle_endtag(self, tag):
-        if tag.lower() in {"script", "style", "noscript", "template"}:
-            if self.ignore_depth > 0:
-                self.ignore_depth -= 1
+        tag = tag.lower()
+
+        if tag in self.IGNORED_TAGS:
+            if self._ignored_depth > 0:
+                self._ignored_depth -= 1
+            return
+
+        if self._ignored_depth:
+            return
+
+        if (
+            self._current_heading
+            and tag == self._current_heading
+        ):
+            heading = self._normalize_text(
+                " ".join(self._current_heading_parts)
+            )
+
+            if heading:
+                self.headings.append(
+                    {
+                        "tag": tag,
+                        "text": heading,
+                    }
+                )
+
+            self._current_heading = None
+            self._current_heading_parts = []
 
     def handle_data(self, data):
-        if self.ignore_depth == 0:
-            text = data.strip()
-            if text:
-                self.parts.append(text)
+        if self._ignored_depth:
+            return
+
+        text = self._normalize_text(data)
+
+        if not text:
+            return
+
+        self.text_parts.append(text)
+
+        if self._current_heading:
+            self._current_heading_parts.append(text)
+
+    @staticmethod
+    def _normalize_text(value):
+        return re.sub(
+            r"\s+",
+            " ",
+            value or "",
+        ).strip()
 
     def get_text(self):
-        return " ".join(self.parts)
+        return self._normalize_text(
+            " ".join(self.text_parts)
+        )
+
+    def get_headings(self):
+        return self.headings
 
 
 class RenderDiffAnalyzer:
-    def __init__(
-        self,
-        meaningful_text_delta: int = 100,
-        meaningful_ratio: float = 0.20,
-    ):
-        self.meaningful_text_delta = meaningful_text_delta
-        self.meaningful_ratio = meaningful_ratio
+    """
+    Compare raw HTML against browser-rendered HTML.
 
-    def _extract_text(self, html):
-        if not html:
-            return ""
+    The analyzer reports deterministic evidence only.
+    It does not assign severity or recommendations.
+    """
+
+    MEANINGFUL_TEXT_DELTA = 100
+    MEANINGFUL_RATIO = 0.20
+
+    # Prevent very large pages from creating enormous evidence payloads.
+    MAX_COMPARISON_TEXT = 50000
+
+    # Keep rendered-only evidence compact.
+    MAX_RENDERED_ONLY_SAMPLE = 500
+
+    def _parse(self, html):
+        parser = VisibleContentParser()
 
         try:
-            parser = TextExtractor()
-            parser.feed(html)
-            text = unescape(parser.get_text())
+            parser.feed(html or "")
+            parser.close()
         except Exception:
-            text = re.sub(r"<[^>]+>", " ", html)
+            # Return whatever could be extracted before parser failure.
+            pass
 
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
+        return parser.get_text(), parser.get_headings()
 
-    def _normalize_text(self, text):
-        return re.sub(r"\s+", " ", text).strip()
+    def _normalize_for_comparison(self, text):
+        return re.sub(
+            r"\s+",
+            " ",
+            text or "",
+        ).strip()
 
-    def _extract_headings(self, html):
-        if not html:
-            return []
+    def _calculate_ratio(self, raw_length, rendered_length):
+        """
+        Calculate relative text growth/reduction.
 
-        headings = re.findall(
-            r"<h[1-6][^>]*>(.*?)</h[1-6]>",
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
+        When raw content is zero, a non-zero rendered result is treated
+        as a complete addition rather than causing division by zero.
+        """
+
+        if raw_length == 0:
+            if rendered_length == 0:
+                return 0.0
+
+            return 1.0
+
+        return round(
+            abs(rendered_length - raw_length)
+            / raw_length,
+            4,
         )
 
-        cleaned = []
+    def _classify_change(
+        self,
+        raw_length,
+        rendered_length,
+        delta,
+        delta_ratio,
+    ):
+        if raw_length == 0 and rendered_length > 0:
+            return "rendered_content_added"
 
-        for heading in headings:
-            heading = re.sub(r"<[^>]+>", " ", heading)
-            heading = unescape(heading)
-            heading = re.sub(r"\s+", " ", heading).strip()
+        if rendered_length > raw_length:
+            if (
+                delta >= self.MEANINGFUL_TEXT_DELTA
+                and delta_ratio
+                >= self.MEANINGFUL_RATIO
+            ):
+                return "rendered_content_added"
 
-            if heading:
-                cleaned.append(heading)
+            if delta > 0:
+                return "minor_rendered_change"
 
-        return cleaned
+        if rendered_length < raw_length:
+            if (
+                delta >= self.MEANINGFUL_TEXT_DELTA
+                and delta_ratio
+                >= self.MEANINGFUL_RATIO
+            ):
+                return "rendered_content_reduced"
+
+            if delta > 0:
+                return "minor_rendered_change"
+
+        return "no_meaningful_change"
+
+    def _heading_key(self, heading):
+        return (
+            heading.get("tag", "").lower(),
+            self._normalize_for_comparison(
+                heading.get("text", "")
+            ).lower(),
+        )
+
+    def _new_rendered_headings(
+        self,
+        raw_headings,
+        rendered_headings,
+    ):
+        raw_heading_keys = {
+            self._heading_key(heading)
+            for heading in raw_headings
+        }
+
+        new_headings = []
+
+        for heading in rendered_headings:
+            if self._heading_key(heading) not in raw_heading_keys:
+                new_headings.append(heading)
+
+        return new_headings
+
+    def _rendered_only_text_sample(
+        self,
+        raw_text,
+        rendered_text,
+    ):
+        """
+        Find text segments present in the rendered version but absent
+        from the raw visible text.
+
+        SequenceMatcher is used on words so the resulting sample is
+        deterministic and preserves rendered order.
+        """
+
+        raw_words = raw_text.split()
+        rendered_words = rendered_text.split()
+
+        if not rendered_words:
+            return ""
+
+        # Avoid excessive comparison cost on very large documents.
+        raw_words = raw_words[: self.MAX_COMPARISON_TEXT]
+        rendered_words = rendered_words[
+            : self.MAX_COMPARISON_TEXT
+        ]
+
+        matcher = SequenceMatcher(
+            None,
+            raw_words,
+            rendered_words,
+            autojunk=False,
+        )
+
+        added_parts = []
+
+        for opcode, i1, i2, j1, j2 in matcher.get_opcodes():
+            if opcode == "insert":
+                added_parts.extend(
+                    rendered_words[j1:j2]
+                )
+
+            elif opcode == "replace":
+                added_parts.extend(
+                    rendered_words[j1:j2]
+                )
+
+        if not added_parts:
+            return ""
+
+        sample = " ".join(added_parts)
+
+        return sample[
+            : self.MAX_RENDERED_ONLY_SAMPLE
+        ]
 
     def analyze(self, raw_html, rendered_html):
-        raw_text = self._extract_text(raw_html)
-        rendered_text = self._extract_text(rendered_html)
+        """
+        Compare raw and rendered HTML and return evidence.
+        """
 
-        raw_text = self._normalize_text(raw_text)
-        rendered_text = self._normalize_text(rendered_text)
+        raw_text, raw_headings = self._parse(
+            raw_html
+        )
+
+        rendered_text, rendered_headings = self._parse(
+            rendered_html
+        )
+
+        raw_text = self._normalize_for_comparison(
+            raw_text
+        )
+
+        rendered_text = self._normalize_for_comparison(
+            rendered_text
+        )
 
         raw_length = len(raw_text)
         rendered_length = len(rendered_text)
 
-        delta = rendered_length - raw_length
+        text_delta = rendered_length - raw_length
 
-        if raw_length > 0:
-            ratio = delta / raw_length
-        elif rendered_length > 0:
-            ratio = 1.0
-        else:
-            ratio = 0.0
+        absolute_text_delta = abs(text_delta)
 
-        raw_headings = self._extract_headings(raw_html)
-        rendered_headings = self._extract_headings(rendered_html)
-
-        new_headings = [
-            heading
-            for heading in rendered_headings
-            if heading not in raw_headings
-        ]
-
-        meaningful_change = (
-            delta >= self.meaningful_text_delta
-            and ratio >= self.meaningful_ratio
+        text_delta_ratio = self._calculate_ratio(
+            raw_length,
+            rendered_length,
         )
 
-        if meaningful_change:
-            status = "rendered_content_added"
-        elif rendered_length > raw_length:
-            status = "minor_rendered_change"
-        elif rendered_length < raw_length:
-            status = "rendered_content_reduced"
-        else:
-            status = "no_meaningful_change"
+        status = self._classify_change(
+            raw_length,
+            rendered_length,
+            absolute_text_delta,
+            text_delta_ratio,
+        )
 
-        return {
-            "check": "raw_vs_rendered_html",
-            "status": status,
-            "evidence": {
-                "raw_text_length": raw_length,
-                "rendered_text_length": rendered_length,
-                "text_length_delta": delta,
-                "text_length_ratio": round(ratio, 3),
-                "raw_heading_count": len(raw_headings),
-                "rendered_heading_count": len(rendered_headings),
-                "new_rendered_headings": new_headings[:20],
-                "meaningful_change": meaningful_change,
+        new_rendered_headings = (
+            self._new_rendered_headings(
+                raw_headings,
+                rendered_headings,
+            )
+        )
+
+        raw_heading_count = len(raw_headings)
+        rendered_heading_count = len(
+            rendered_headings
+        )
+
+        heading_delta = (
+            rendered_heading_count
+            - raw_heading_count
+        )
+
+        rendered_only_text_sample = (
+            self._rendered_only_text_sample(
+                raw_text,
+                rendered_text,
+            )
+        )
+
+        meaningful_change = status in {
+            "rendered_content_added",
+            "rendered_content_reduced",
+        }
+
+        evidence = {
+            "raw_text_length": raw_length,
+            "rendered_text_length": rendered_length,
+            "text_delta": text_delta,
+            "absolute_text_delta": absolute_text_delta,
+            "text_delta_ratio": text_delta_ratio,
+
+            "raw_heading_count": raw_heading_count,
+            "rendered_heading_count": (
+                rendered_heading_count
+            ),
+            "heading_delta": heading_delta,
+
+            "new_rendered_headings": (
+                new_rendered_headings
+            ),
+
+            "rendered_only_text_sample": (
+                rendered_only_text_sample
+            ),
+
+            "thresholds": {
+                "meaningful_text_delta": (
+                    self.MEANINGFUL_TEXT_DELTA
+                ),
+                "meaningful_ratio": (
+                    self.MEANINGFUL_RATIO
+                ),
             },
+
+            "meaningful_change": meaningful_change,
+
+            "source": "raw_vs_rendered_html",
+            "confidence": "high",
+        }
+
+        # Keep the important metrics at the top level as well.
+        # This preserves compatibility with older consumers while
+        # providing the richer nested evidence structure.
+        return {
+            "status": status,
+
+            "raw_text_length": raw_length,
+            "rendered_text_length": rendered_length,
+            "text_delta": text_delta,
+            "text_delta_ratio": text_delta_ratio,
+
+            "raw_heading_count": raw_heading_count,
+            "rendered_heading_count": (
+                rendered_heading_count
+            ),
+            "new_rendered_headings": (
+                new_rendered_headings
+            ),
+
+            "meaningful_change": meaningful_change,
+
+            "evidence": evidence,
         }

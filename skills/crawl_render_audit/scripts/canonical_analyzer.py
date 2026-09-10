@@ -1,92 +1,101 @@
-from urllib.parse import urlparse
-
 from .url_utils import normalize_url
 
 
 class CanonicalAnalyzer:
+    """
+    Deterministic canonical URL analyzer.
+
+    Reports observed canonical behavior without assigning severity.
+    """
+
+    def _evidence(
+        self,
+        page_url,
+        canonical,
+        source="raw_html",
+        confidence="high",
+        **extra,
+    ):
+        evidence = {
+            "page_url": page_url,
+            "observed_canonical": canonical,
+            "source": source,
+            "confidence": confidence,
+        }
+
+        evidence.update(extra)
+
+        return evidence
 
     def analyze(
         self,
-        page_url: str,
-        canonical: str | None,
+        page_url,
+        canonical,
     ):
-
         if not canonical:
-
             return {
-                "check": "canonical",
                 "status": "missing",
-                "evidence": {
-                    "page_url": page_url,
-                    "canonical": None,
-                },
+                "evidence": self._evidence(
+                    page_url,
+                    None,
+                ),
             }
 
-        normalized_page = normalize_url(
-            page_url
-        )
-
-        normalized_canonical = normalize_url(
-            canonical
-        )
+        normalized_page = normalize_url(page_url)
+        normalized_canonical = normalize_url(canonical)
 
         if not normalized_canonical:
-
             return {
-                "check": "canonical",
                 "status": "invalid",
-                "evidence": {
-                    "page_url": page_url,
-                    "canonical": canonical,
-                },
+                "evidence": self._evidence(
+                    page_url,
+                    canonical,
+                    normalized_canonical=None,
+                ),
             }
 
         page_host = (
-            urlparse(
-                normalized_page
-            ).hostname
-            or ""
-        ).lower()
+            normalized_page.split("/")[2]
+            if normalized_page and "://" in normalized_page
+            else None
+        )
 
         canonical_host = (
-            urlparse(
-                normalized_canonical
-            ).hostname
-            or ""
-        ).lower()
+            normalized_canonical.split("/")[2]
+            if "://" in normalized_canonical
+            else None
+        )
 
-        if page_host != canonical_host:
-
+        if page_host and canonical_host and page_host != canonical_host:
             return {
-                "check": "canonical",
                 "status": "cross_domain",
-                "evidence": {
-                    "page_url": page_url,
-                    "canonical": normalized_canonical,
-                    "page_hostname": page_host,
-                    "canonical_hostname": canonical_host,
-                },
+                "evidence": self._evidence(
+                    page_url,
+                    canonical,
+                    normalized_page_url=normalized_page,
+                    normalized_canonical_url=normalized_canonical,
+                    page_host=page_host,
+                    canonical_host=canonical_host,
+                ),
             }
 
-        if (
-            normalized_page
-            == normalized_canonical
-        ):
-
+        if normalized_page == normalized_canonical:
             return {
-                "check": "canonical",
                 "status": "self_referencing",
-                "evidence": {
-                    "page_url": normalized_page,
-                    "canonical": normalized_canonical,
-                },
+                "evidence": self._evidence(
+                    page_url,
+                    canonical,
+                    normalized_page_url=normalized_page,
+                    normalized_canonical_url=normalized_canonical,
+                ),
             }
 
         return {
-            "check": "canonical",
             "status": "points_elsewhere",
-            "evidence": {
-                "page_url": normalized_page,
-                "canonical": normalized_canonical,
-            },
+            "evidence": self._evidence(
+                page_url,
+                canonical,
+                normalized_page_url=normalized_page,
+                normalized_canonical_url=normalized_canonical,
+            ),
         }
