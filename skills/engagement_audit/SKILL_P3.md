@@ -1,6 +1,6 @@
 ---
 name: engagement-audit
-description: Audit whether important customer-facing website journeys provide clear, reachable, textually understandable next actions and the information needed to make decisions. Use deterministic evidence rather than subjective UX judgments.
+description: Audit whether important customer-facing website journeys provide a clear, reachable, understandable and actionable path from user intent to the appropriate next action. Use deterministic evidence and preserve UNKNOWN rather than inferring defects.
 license: your-choice
 ---
 
@@ -8,94 +8,256 @@ license: your-choice
 
 ## Purpose
 
-Audit the on-site engagement half of the Round-2 problem: after a visitor or AI assistant reaches the site, can they understand the offering, find the information needed for a decision, and reach an appropriate next action?
+Audit the on-site engagement side of the Round-3 problem:
 
-The skill detects concrete actionability problems, not visual-design preferences.
+> Once a visitor or AI/search system reaches a website, can the relevant offering be understood, the information needed for a decision be found, and the appropriate next action be reached?
+
+The audit is evidence-first. It detects concrete actionability, discoverability and journey-completion problems; it does not judge visual aesthetics or subjective UX preferences.
+
+## When to use
+
+Use this skill on normalized page/site evidence produced by the repository's crawler/render layer.
+
+Do not use it for:
+
+- generic crawl/link mechanics;
+- robots.txt, canonical, metadata or JSON-LD syntax validation;
+- freshness/corroboration;
+- proprietary product/search ranking;
+- orchestration or cross-skill deduplication.
 
 ## Inputs
 
-The skill may receive normalized page/site data from the crawler. Adapt the repository's real `PageResult` fields to these logical inputs.
+The upstream adapter must normalize the repository's real `PageResult` into evidence-backed logical fields. Fields may be `UNKNOWN` when evidence cannot establish them.
 
-- `url`: audited page URL.
-- `intent`: inferred or explicitly classified page intent when supported by deterministic content.
-- `ctas`: extracted actions with textual label, target, and observed status when available.
-- `required_facts`: decision facts relevant to the identified page intent.
-- `missing_facts`: required facts that were not found.
-- `actions`: important actions and whether equivalent textual context exists.
-- `value_proposition`: directly extracted title/headings/summary information.
-- `contact_path`, `booking_path`, `purchase_path`, `demo_path`, `support_path`: available action routes when extracted.
-- `follow_up_links`: FAQ/help/docs/support or equivalent paths.
-- `forms`: exposed labels, submit controls, and targets where available.
+### Page and intent
 
-The adapter should provide observed evidence only. Do not manufacture intent or missing information when the page does not support the conclusion.
+- `url`
+- `page_type`
+- `intent`
+- `high_intent`
+- `core_service`
+- `intent_evidence`
+
+`high_intent`, `core_service`, and similar classifications must be established upstream from observable evidence. A non-empty `intent` string alone is not sufficient.
+
+### Actions
+
+`ctas`: actions with, where available:
+
+- `text`
+- `target`
+- `status`
+- `important`
+- `actionable`
+- `target_purpose`
+- `mismatch`
+
+`actions`: important interactions with, where available:
+
+- `text`
+- `important`
+- `visual_only`
+- `text_context`
+- `link_context`
+- `accessibility_context`
+- `structured_context`
+
+Action mechanisms may be links, buttons, forms, mailto/tel links, JavaScript controls, modals, dynamic routes, external destinations, or equivalent machine-readable mechanisms.
+
+### Offering and decision information
+
+- `value_proposition`
+- `offering_context`
+- `required_facts`
+- `observed_facts`
+- `missing_facts`
+- `evidence_for_requirement`
+
+Required decision facts must be justified by the identified page/offering journey.
+
+Do not assume that price, availability, reviews, or any other fact is universally required.
+
+### Action routes
+
+- `expected_action`
+- `action_path`
+- `contact_path`
+- `booking_path`
+- `purchase_path`
+- `demo_path`
+- `support_path`
+
+The expected route must follow the established page/offer intent.
+
+No particular CTA type is universally required.
+
+### Forms and follow-up
+
+`forms`: where available:
+
+- `important`
+- `purpose_clear`
+- `submit_control`
+- `requires_target`
+- `target`
+- `execution_result`
+
+Also:
+
+- `follow_up_expected`
+- `follow_up_links`
+
+Follow-up is required only where the journey establishes a genuine need for continuation or predictable follow-up information.
+
+### Important/opaque actions
+
+- `important_action`
+- `opaque_interaction`
+- `action_identifiable`
+- `direct_target`
+
+An ordinary button, modal, JavaScript action, dynamic route, or missing conventional URL is not itself a defect.
+
+Opaqueness must materially prevent deterministic identification or invocation of an important action.
+
+### Journey
+
+- `page_promise`
+- `destination_purpose`
+- `action_mismatch`
+- `conversion_path`
+- `required_steps`
+- `available_steps`
+- `terminal_state`
+
+Never invent a canonical conversion path.
+
+Evaluate only explicitly established required steps.
 
 ## Procedure
 
-1. Establish the page's user/customer intent from direct content.
-2. Identify the expected next action for that intent.
-3. Inspect deterministic action, target, content, and decision-information signals.
-4. Record exact URLs, labels, missing facts, and status codes where available.
-5. Trigger only checks supported by evidence.
-6. Convert each triggered check into the shared finding schema.
-7. Return findings to the orchestrator; do not own orchestration or deduplication.
+1. Use only observable PageResult/site evidence.
+2. Establish page type and journey intent from direct evidence.
+3. Determine the context-appropriate expected action, if one is established.
+4. Inspect actions, targets, offering information, decision facts, forms, follow-up paths, machine-readable context and journey steps.
+5. Treat missing/unknown extraction as `UNKNOWN`, not as proof of absence.
+6. Trigger only checks whose evidence preconditions are satisfied.
+7. Produce concise, reproducible evidence identifying the inspected page/action and the deterministic observation.
+8. Return check findings to the orchestrator/adapter for canonical Finding conversion, severity normalization and deduplication.
 
 ## Deterministic checks
 
-### EN-01 — Primary CTA presence
+### EN-01 — Primary CTA Presence
 
-For a clearly identifiable high-intent page, detect whether there is an identifiable useful next action.
+For a deterministically identified high-intent page, detect whether an actionable next step appropriate to the established intent is exposed.
 
-Do not flag informational pages merely because they do not contain a conversion CTA.
+Do not flag informational, editorial, documentation, legal, help or completed/confirmation pages merely because they lack a conversion CTA.
 
-### EN-02 — CTA reachability
+### EN-02 — CTA Reachability
 
-Resolve an important CTA target when status information is available. Trigger when the core action target returns an error or is otherwise demonstrably unreachable.
+For an important CTA whose target and observed status are available, trigger when the target is demonstrably unreachable, such as an observed HTTP 4xx/5xx response.
 
-If the repository's crawler already owns HTTP/link failures, emit this only when the finding is specifically about the customer action path and avoid duplicating the technical finding.
+Do not convert an unavailable status into a failure.
 
-### EN-03 — CTA clarity
+Avoid duplicating a generic crawler finding unless the engagement consequence is distinct.
 
-Compare CTA wording with its target purpose. Trigger only when the action is materially ambiguous or sends the user toward a purpose different from the one promised.
+### EN-03 — CTA Clarity
 
-### EN-04 — Value proposition clarity
+Trigger only when CTA wording materially conflicts with the established destination purpose.
 
-Use directly extracted title/headings/summary content to determine whether the offering and intended audience/use are reasonably identifiable. Trigger only where a concrete absence or contradiction is demonstrated.
+Short, unconventional or stylistically different wording is not sufficient evidence.
 
-### EN-05 — Decision information completeness
+### EN-04 — Product/Service Information and Value Proposition
 
-For an identifiable high-intent journey, detect important missing facts such as price, plan, scope, eligibility, location, availability, or equivalent decision criteria when those facts are necessary to the action.
+For a deterministically identified high-intent page, determine whether directly extracted content establishes the relevant offering and audience/use context needed to understand the page.
 
-### EN-06 — Contact/action path
+Do not require a particular marketing phrase.
 
-Detect whether a core service has a discoverable route such as contact, booking, purchase, demo, application, or support. The expected route must follow the page's intent.
+Do not infer site-wide absence from one missing extraction field.
 
-### EN-07 — Form actionability
+### EN-05 — Decision Information Completeness
 
-Inspect exposed form labels, purpose, submit control, and action target. Trigger when an important form has a demonstrable lack of understandable purpose or usable submission path.
+For an established journey, evaluate only decision facts explicitly justified as necessary for that journey.
 
-### EN-08 — Follow-up path
+Trigger only when required facts are established and the evidence demonstrates that one or more are absent.
 
-Check whether predictable follow-up questions have an available FAQ/help/docs/support path where the journey materially needs one.
+`UNKNOWN` or extraction failure is not proof of absence.
 
-### EN-09 — Stable direct URL
+### EN-06 — Context-Appropriate Contact/Action Path
 
-Check whether important information or actions have a usable direct target URL rather than depending entirely on an opaque interaction that cannot be represented textually.
+For a deterministically established core-service journey with a known expected action, detect whether an appropriate discoverable route exists, such as:
 
-### EN-10 — Content/action consistency
+- purchase;
+- booking;
+- quote;
+- sales contact;
+- signup;
+- demo;
+- trial;
+- application;
+- support;
+- contact;
+- request-information.
 
-Compare the page's promise or heading with the destination/action. Trigger when the page promises one action but routes the visitor to an unrelated purpose.
+Do not require a purchase CTA when the established intent calls for another action.
 
-### EN-11 — AI-readable action context
+### EN-07 — Form Actionability
 
-Check whether important actions have meaningful textual context. Trigger when the action is marked as visually dependent and no equivalent textual context is available.
+For an important form, trigger when the evidence demonstrates:
 
-### EN-12 — Conversion-path completeness
+- a missing clear purpose;
+- a missing usable submit control;
+- a missing required submission target; or
+- deterministic execution failure.
 
-Trace the minimum path from intent → required decision information → action. Trigger when a concrete missing step prevents completion or leaves the visitor at a dead end.
+Do not require a target when the form architecture does not establish that one is needed.
 
-## Finding contract
+### EN-08 — Required Follow-up Path
 
-Every emitted finding must conform to the repository's shared finding schema:
+Trigger only when the established journey requires subsequent information/action and no relevant follow-up path is discovered.
+
+Do not require FAQ/help/support on every page.
+
+### EN-09 — Important Action Opaqueness
+
+Trigger only when an important action is genuinely opaque:
+
+- its destination or invocation cannot be deterministically established from available evidence;
+- no usable direct target/representation exists; and
+- the evidence explicitly establishes that the action is opaque.
+
+Do not flag ordinary buttons, modals, JavaScript, dynamic routes or external flows merely because they are non-standard.
+
+### EN-10 — Page/Action Consistency
+
+Trigger when the established page promise materially conflicts with the purpose of the exposed action or resulting destination.
+
+Minor wording differences are not sufficient.
+
+### EN-11 — AI-Readable Action Context
+
+For an important action, determine whether its purpose/destination can be established from meaningful:
+
+- visible text;
+- link context;
+- accessibility metadata;
+- structured information; or
+- equivalent machine-readable evidence.
+
+Trigger only when deterministic evidence shows that no meaningful textual or machine-readable representation exists.
+
+### EN-12 — Conversion-Path Completeness
+
+For an explicitly established journey, compare required steps with available/discovered steps.
+
+Trigger only when one or more objectively required steps are absent or inaccessible.
+
+Do not invent a canonical journey.
+
+## Finding Contract
+
+Each triggered check must ultimately become the repository's shared Finding:
 
 - `id`
 - `source_skill`: `engagement-audit`
@@ -105,45 +267,71 @@ Every emitted finding must conform to the repository's shared finding schema:
 - `severity`: `critical`, `high`, `medium`, or `low`
 - `evidence`
 - `why_it_matters`
-- `suggested_action` with a concise action summary and priority
+- `suggested_action`
 
-Evidence must be concrete enough for another auditor to reproduce the finding.
+`suggested_action` must contain a concise remediation and priority.
+
+Evidence must identify:
+
+1. the inspected page/action;
+2. the deterministic observation;
+3. the relevant label, URL, status or context where available;
+4. why the check triggered.
+
+The check script may return an intermediate check-level record only if the adapter/provider immediately converts it to the canonical Finding contract.
 
 ## Severity
 
-- **critical** — core action is blocked or materially misleading.
-- **high** — major friction affects a broad or core journey.
-- **medium** — actionable friction affects a narrower journey.
-- **low** — minor optimization with limited impact.
+- `critical` — core action is blocked or materially misleading with severe customer impact.
+- `high` — major defect affects a core or broad customer journey.
+- `medium` — meaningful actionability defect affects an important but narrower journey.
+- `low` — minor optimization with limited impact.
 
-Use the lower severity when evidence does not justify a stronger classification.
+Use the lowest severity justified by evidence.
 
-## Output rules
+Do not inflate severity.
 
-For each triggered check, emit:
+## False-Positive Boundaries
 
-1. the exact page/action inspected;
-2. the deterministic result;
-3. the evidence supporting the result;
-4. the customer/AI engagement impact;
-5. a concrete prioritized remediation.
+- Missing extraction is not the same as proven absence.
+- No internal link is not automatically a dead end.
+- No conventional URL is not automatically a broken action.
+- A modal or JavaScript action is not automatically opaque.
+- `Talk to Sales` is not inherently a weak CTA.
+- `Free Trial` instead of `Buy` is not inherently a mismatch.
+- Price is not universally required.
+- FAQ/help/support is not universally required.
+- A page without a CTA is not automatically defective.
+- An external payment, booking, authentication or application flow may be a valid continuation.
+- Completed transactions, confirmations and successful submissions may legitimately terminate a journey.
+- An unavailable field must not be interpreted as a negative observation.
+- A classification must not be inferred solely from a free-text label.
 
-Do not use subjective labels such as `bad UX`, `ugly`, or `confusing` without a deterministic supporting signal.
+## Ownership Boundaries
 
-## Non-goals and ownership boundaries
+Engagement Audit does not own:
 
-Do not duplicate:
-
-- robots.txt compliance;
-- HTTP status/crawl mechanics;
-- general broken-link crawling;
-- canonical/meta/JSON-LD syntax checks;
+- robots.txt;
+- HTTP crawling mechanics;
+- generic broken-link detection;
+- canonical/meta/JSON-LD syntax;
 - marketplace registration;
+- proprietary search/recommendation ranking;
 - orchestration;
 - cross-skill deduplication.
 
-A raw HTTP failure should normally remain a crawler/technical finding; this skill may additionally identify the customer-action consequence only when that consequence is distinct and supported.
+A raw HTTP failure normally remains a crawler/technical finding.
 
-## References and implementation
+P3 may additionally report the distinct customer-action consequence when supported.
 
-Use the accompanying `references/` files for the check catalogue and research rationale. Use `scripts/engagement_checks.py` for dependency-free deterministic helpers. The orchestrator should adapt real crawler output into the logical inputs above.
+## Quality Gate
+
+A valid Engagement finding must be traceable as:
+
+`PageResult evidence → normalized P3 input → EN check → canonical Finding`
+
+The audit must preserve uncertainty.
+
+If the evidence cannot establish a defect, return no finding rather than inventing one.
+
+The P3 Engagement layer is responsible for deterministic customer/actionability evidence, not for ranking products or deciding which products should appear in a search result.
