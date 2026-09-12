@@ -1,353 +1,482 @@
-# P3 False-Positive Log
+# False-Positive Research Log
 
-This file records cases where a seemingly reasonable audit rule can produce
-an incorrect finding.
+## Purpose
 
-The purpose is to establish explicit boundaries for P3 checks.
+This document records legitimate website patterns that could be
+incorrectly flagged by the freshness or engagement audit rules.
 
----
+The research is intended to establish semantic boundaries for the
+audit rules and reduce false positives.
 
-## FP-001 — Missing Date ≠ Stale
+These examples are research evidence. They do not by themselves prove
+that the implementation code passes every case. Implementation
+correctness must be verified separately through unit/integration tests.
 
-### Trigger
+Assigned false-positive cases:
 
-A page has no published or updated date.
+- FP-01 — Historical Date
+- FP-02 — Event Date
+- FP-03 — Missing Publication Date ≠ Stale Content
+- FP-04 — Talk to Sales Can Be a Valid CTA
+- FP-05 — Free Trial Can Be a Valid Engagement Path
+- FP-06 — No Internal Links ≠ Dead End
 
-### Naive Finding
-
-"Content is stale."
-
-### Correct Result
-
-False positive.
-
-### Reason
-
-Absence of a date does not establish that the information is old.
-
-### Rule Change
-
-Do not emit a stale-content finding from a missing date alone.
-
-### Related Root Cause
-
-FR-RC-02
 
 ---
 
-## FP-002 — Historical Date ≠ Expired Content
+# FP-01 — Historical Date
 
-### Trigger
+## Potential Audit Rule
 
-A page contains an old historical date such as:
+Flag content as stale when an old year or historical date is detected.
 
-"Company founded in 2010."
+## Actual Observation
 
-### Naive Finding
+**Site:** Microsoft  
+**Page:** 2025 Annual Report / Investor Relations  
+**URL:** https://www.microsoft.com/investor/reports/ar25/
 
-"Page contains stale information."
+Microsoft's investor materials identify a Fiscal Year 2025 Annual
+Report and provide the report as a financial-reporting document.
 
-### Correct Result
+Annual reports naturally contain historical reporting periods,
+including comparisons between fiscal years.
 
-False positive.
+## Why the Naive Rule Would Flag It
 
-### Reason
+A freshness checker based only on detected years or dates could
+interpret an older year appearing in the document as the publication
+or update date.
 
-The date describes a historical fact rather than current information.
+For example, a reference to Fiscal Year 2024 could be incorrectly
+treated as evidence that the page itself is from 2024.
 
-### Rule Change
+## Why It Is Legitimate
 
-Only evaluate dates for freshness when the date is semantically attached to
-time-sensitive information.
+The year may describe the subject matter of the document rather than
+the date on which the web content was published or updated.
 
-### Related Root Cause
+A historical reporting period is therefore not sufficient evidence of
+staleness.
 
-FR-RC-01
+## Required Boundary
 
----
+Historical dates, reporting periods, and dates describing the subject
+matter must not automatically be treated as freshness signals.
 
-## FP-003 — Different Phone Formatting ≠ Different Phone Number
+Freshness logic should distinguish between:
 
-### Trigger
+- publication dates
+- last-modified/update dates
+- expiration/validity dates
+- historical reporting periods
+- dates describing events or subject matter
 
-Two pages contain:
+Only semantically relevant freshness dates should be used to establish
+staleness.
 
-`+91 9876543210`
+## Relevant Root Cause
 
-and
+**FR-RC-01 — Stale time-sensitive content**
 
-`+91-987-654-3210`
+## Evidence
 
-### Naive Finding
+Microsoft Investor Relations / 2025 Annual Report:
 
-"Conflicting phone numbers."
+https://www.microsoft.com/investor/reports/ar25/
 
-### Correct Result
+The Microsoft investor site explicitly identifies the Fiscal Year 2025
+Annual Report, demonstrating that years appearing in investor
+documents can represent reporting periods rather than page freshness
+metadata.
 
-False positive.
-
-### Reason
-
-The values may represent the same phone number.
-
-### Rule Change
-
-Normalize phone values before comparison.
-
-### Related Root Cause
-
-FR-RC-04
-
----
-
-## FP-004 — Different Email Addresses Can Be Legitimate
-
-### Trigger
-
-About page:
-
-`hello@example.com`
-
-Contact page:
-
-`support@example.com`
-
-### Naive Finding
-
-"Incorrect contact information."
-
-### Correct Result
-
-Potential issue, not confirmed contradiction.
-
-### Reason
-
-Different addresses can legitimately serve different purposes.
-
-### Rule Change
-
-Require contextual evidence before treating different emails as a factual
-contradiction.
-
-### Related Root Cause
-
-FR-RC-03
 
 ---
 
-## FP-005 — Missing CTA on Informational Page
+# FP-02 — Event Date
 
-### Trigger
+## Potential Audit Rule
 
-An article page contains no purchase, signup or contact CTA.
+Treat a detected event date as the publication or update date of the
+content and use it as evidence of freshness or staleness.
 
-### Naive Finding
+## Actual Observation
 
-"Weak engagement / missing CTA."
+**Site:** Google Search Central  
+**Page:** Event structured-data documentation  
+**URL:** https://developers.google.com/search/docs/appearance/structured-data/event
 
-### Correct Result
+Google's Event structured-data documentation defines event properties
+including:
 
-False positive unless the page's purpose requires an onward action.
+- `startDate`
+- `endDate`
+- `previousStartDate`
 
-### Reason
+These properties describe when an event occurs or changes schedule.
 
-Informational pages can legitimately direct users through related content
-rather than conversion actions.
+## Why the Naive Rule Would Flag It
 
-### Rule Change
+A generic date-extraction rule could detect a value such as:
 
-CTA checks must be contextual.
+`2025-07-21`
 
-### Related Root Cause
+and incorrectly assume that this is the publication or last-update
+date of the documentation page.
 
-EN-RC-02
+## Why It Is Legitimate
 
----
+The date belongs to the event represented by the structured data.
 
-## FP-006 — No Links ≠ Dead End
+It does not necessarily describe when the documentation itself was
+published or modified.
 
-### Trigger
+## Required Boundary
 
-A page contains no internal links.
+Event dates must not automatically be interpreted as page publication
+or update dates.
 
-### Naive Finding
+Freshness evaluation must distinguish dates describing:
 
-"Dead-end page."
+- the page/document
+- an event
+- a product/service
+- a reporting period
+- another subject represented by the page
 
-### Correct Result
+## Relevant Root Cause
 
-Needs contextual verification.
+**FR-RC-01 — Stale time-sensitive content**
 
-### Reason
+## Evidence
 
-Some pages may legitimately be terminal or may expose actions outside the
-captured link data.
+Google Search Central — Event structured data:
 
-### Rule Change
+https://developers.google.com/search/docs/appearance/structured-data/event
 
-Require evidence that the page represents an actionable journey before
-flagging a dead end.
-
-### Related Root Cause
-
-EN-RC-03
-
----
-
-## FP-007 — Raw Text Cannot Prove Visual Defect
-
-### Trigger
-
-PageResult contains little text.
-
-### Naive Finding
-
-"Poor visual hierarchy."
-
-### Correct Result
-
-Do not emit a visual finding.
-
-### Reason
-
-Raw text does not establish layout, visibility or above-fold presentation.
-
-### Rule Change
-
-Mark the observation as requiring rendering context.
-
-### Related Root Cause
-
-EN-RC-04
 
 ---
 
-## FP-008 — Different Entity Strings Do Not Automatically Mean Multiple Entities
+# FP-03 — Missing Publication Date ≠ Stale Content
 
-### Trigger
+## Potential Audit Rule
 
-Metadata contains one organization name while visible text contains a
-brand/product/subsidiary name.
+Flag a page as stale when no publication or last-updated date is
+detected.
 
-### Naive Finding
+## Actual Observation
 
-"Entity ambiguity."
+**Site:** Amazon Web Services (AWS)  
+**Page:** Contact AWS  
+**URL:** https://aws.amazon.com/contact-us/
 
-### Correct Result
+The page is an operational contact/support page.
 
-Potential ambiguity requiring verification.
+It provides pathways for:
 
-### Reason
+- sales
+- compliance support
+- technical support
+- account/billing support
 
-Brands, subsidiaries and legal entities can legitimately have different
-names.
+The page is not presented as an article or dated publication.
 
-### Rule Change
+## Why the Naive Rule Would Flag It
 
-Require contextual evidence before reporting confirmed entity ambiguity.
+A checker that requires a publication date for every page could
+interpret the absence of such metadata as evidence that the page is
+stale.
 
-### Related Root Cause
+## Why It Is Legitimate
 
-FR-RC-05
+Operational pages do not necessarily require article-style
+publication metadata.
 
----
+The page's usefulness comes from its current functional pathways and
+support/contact mechanisms, not from a publication timestamp.
 
-## FP-009 — Repeated First-Party Evidence Is Not External Corroboration
+## Required Boundary
 
-### Trigger
+Missing publication metadata alone must not establish a stale-content
+finding.
 
-The same claim appears on About, Contact and Services pages.
+The audit should first consider:
 
-### Naive Finding
+1. page purpose/type
+2. whether the content is time-sensitive
+3. whether a freshness date is expected for that page type
 
-"Claim independently corroborated."
+A missing date may therefore result in insufficient freshness evidence
+rather than a positive stale-content finding.
 
-### Correct Result
+## Relevant Root Cause
 
-False positive if described as independent corroboration.
+**FR-RC-01 — Stale time-sensitive content**
 
-### Reason
+## Evidence
 
-All evidence originates from the same first-party website.
+AWS — Contact AWS:
 
-### Rule Change
+https://aws.amazon.com/contact-us/
 
-Label this as:
+The current page provides active sales and support pathways without
+being an article-style dated resource.
 
-`verification_status = on_site_only`
-
-### Related Root Cause
-
-FR-RC-06
-
----
-
-## FP-010 — Low Text Volume Is Not Automatically a Defect
-
-### Trigger
-
-A page contains less than an arbitrary amount of text.
-
-### Naive Finding
-
-"Insufficient content."
-
-### Correct Result
-
-Needs contextual verification.
-
-### Reason
-
-Landing pages, contact pages and application pages may intentionally use
-short copy.
-
-### Rule Change
-
-Use page purpose and available context rather than text length alone.
-
-### Related Root Cause
-
-EN-RC-01
 
 ---
 
-# False-Positive Policy
+# FP-04 — Talk to Sales Can Be a Valid CTA
 
-A P3 rule must not produce a confirmed defect when its evidence only shows:
+## Potential Audit Rule
 
-- absence of optional metadata
-- absence of a generic CTA
-- absence of links
-- old historical dates
-- harmless formatting variation
-- different but contextually legitimate identity strings
-- repeated first-party evidence
-- insufficient rendering information
+Flag a commercial page when its primary CTA does not provide an
+immediate self-service conversion action.
 
-When evidence is incomplete, prefer:
+## Actual Observation
 
-`needs_context_verification`
+**Site:** Microsoft  
+**Page:** Microsoft 365 E3 for enterprise  
+**URL:** https://www.microsoft.com/en-in/microsoft-365/enterprise/e3
 
-over a confirmed defect.
+The page provides:
+
+- pricing information
+- `Contact Sales`
+- `Try for free`
+
+for the enterprise offering.
+
+## Why the Naive Rule Would Flag It
+
+A generic CTA checker might assume that a valid commercial CTA must
+immediately complete a purchase.
+
+It could therefore incorrectly treat `Contact Sales` as weak or
+non-converting.
+
+## Why It Is Legitimate
+
+Enterprise software commonly uses sales-assisted conversion.
+
+A visitor may need:
+
+- organizational discussion
+- pricing guidance
+- deployment information
+- requirements clarification
+- enterprise purchasing assistance
+
+Therefore, contacting sales can be the intended next step.
+
+## Required Boundary
+
+CTA evaluation must consider the intended user journey.
+
+The audit should recognize legitimate conversion paths such as:
+
+- Buy
+- Purchase
+- Contact Sales
+- Request Demo
+- Get Started
+- Sign Up
+- Start Trial
+
+A sales-assisted CTA should not automatically be treated as an
+engagement failure merely because it does not immediately complete a
+purchase.
+
+## Relevant Root Cause
+
+**EN-RC-01 — CTA/action mismatch**
+
+## Evidence
+
+Microsoft 365 E3 for enterprise:
+
+https://www.microsoft.com/en-in/microsoft-365/enterprise/e3
+
+The current page explicitly presents `Contact Sales` as an action for
+the enterprise offering.
+
 
 ---
 
-# Quality Principle
+# FP-05 — Free Trial Can Be a Valid Engagement Path
 
-The P3 audit should follow:
+## Potential Audit Rule
 
-Deterministic evidence
-        ↓
-Context
-        ↓
-Root cause
-        ↓
-Finding
-        ↓
-Recommendation
+Flag a commercial page when it does not provide an immediate purchase
+action.
 
-Never:
+## Actual Observation
 
-Missing signal
-        ↓
-Assume defect
+**Site:** Microsoft  
+**Page:** Microsoft 365 E3 for enterprise  
+**URL:** https://www.microsoft.com/en-in/microsoft-365/enterprise/e3
+
+The page presents `Try for free` alongside the enterprise offering and
+pricing information.
+
+## Why the Naive Rule Would Flag It
+
+A simplistic engagement rule could require an immediate purchase action
+and classify a trial pathway as incomplete.
+
+## Why It Is Legitimate
+
+A free trial is itself a deliberate engagement and conversion
+mechanism.
+
+The intended journey can be:
+
+visitor → trial → product evaluation → conversion
+
+Therefore, requiring a direct purchase action would create a false
+positive for pages intentionally designed around trial-based
+conversion.
+
+## Required Boundary
+
+The audit should recognize legitimate engagement/conversion paths
+including:
+
+- free trial
+- demo
+- signup
+- registration
+- contact sales
+- request quote
+- get started
+
+The checker should evaluate whether a meaningful next action exists,
+not whether one specific CTA type exists.
+
+## Relevant Root Cause
+
+**EN-RC-01 — CTA/action mismatch**
+
+## Evidence
+
+Microsoft 365 E3 for enterprise:
+
+https://www.microsoft.com/en-in/microsoft-365/enterprise/e3
+
+The page currently exposes `Try for free` as a valid action.
+
+
+---
+
+# FP-06 — No Internal Links ≠ Dead End
+
+## Potential Audit Rule
+
+Flag a page as a dead-end journey when no internal links are detected.
+
+## Actual Observation
+
+**Site:** Stripe  
+**Page:** Payment-success page guidance  
+**URL:** https://stripe.com/resources/more/payment-successful-pages
+
+Stripe describes a payment-success page as the screen shown after a
+customer completes a transaction and states that it is typically the
+final step in the checkout flow.
+
+Stripe's Checkout documentation also documents redirecting customers
+to a success page after payment.
+
+## Why the Naive Rule Would Flag It
+
+A rule that equates:
+
+`no internal links`
+
+with:
+
+`dead-end journey`
+
+could incorrectly flag a legitimate terminal page.
+
+## Why It Is Legitimate
+
+Some user journeys intentionally terminate after a successful action.
+
+Examples include:
+
+- payment completion
+- order confirmation
+- successful submission
+- account creation
+- transaction completion
+
+A page can therefore be a valid terminal state even when it does not
+contain ordinary internal-content navigation.
+
+## Required Boundary
+
+Absence of internal links must not independently establish an
+engagement failure.
+
+The audit should consider:
+
+1. page purpose
+2. whether the user has already completed the intended action
+3. whether the page represents a legitimate terminal state
+4. whether a next action is actually expected
+
+A transaction-success page should not be classified as a dead end
+merely because the journey has intentionally reached its terminal
+state.
+
+## Relevant Root Cause
+
+**EN-RC-02 — Dead-end journey**
+
+## Evidence
+
+Stripe — Payment successful pages:
+
+https://stripe.com/resources/more/payment-successful-pages
+
+Stripe explicitly describes the payment-success page as typically the
+final step in the checkout flow.
+
+Stripe Checkout documentation:
+
+https://docs.stripe.com/payments/checkout/custom-success-page
+
+Stripe documents redirecting customers to a success page after
+successful Checkout completion.
+
+
+---
+
+# Research Boundary
+
+These examples establish semantic boundaries for the audit.
+
+They do NOT mean that:
+
+- every page without a date is fresh
+- every CTA is valid
+- every page without internal links is healthy
+- every old year is harmless
+- every event date should be ignored
+
+Instead, the examples demonstrate that these signals cannot be
+interpreted in isolation.
+
+The audit should evaluate the meaning and context of the evidence before
+raising a finding.
+
+# Summary
+
+| ID | False-positive boundary |
+|---|---|
+| FP-01 | Historical/reporting dates are not automatically freshness dates |
+| FP-02 | Event dates are not automatically publication/update dates |
+| FP-03 | Missing publication metadata does not automatically mean stale |
+| FP-04 | Sales-assisted CTAs can be valid engagement paths |
+| FP-05 | Trial/signup/demo paths can be valid conversion paths |
+| FP-06 | No internal links does not automatically mean a dead-end journey |
