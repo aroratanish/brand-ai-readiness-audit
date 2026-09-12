@@ -195,6 +195,7 @@ def findings_for_page(page: PageResult) -> list[dict]:
             build_finding(
                 _finding_id("RENDER-ONLY", page_url),
                 page_url,
+                "discoverability",
                 "Important page content appears only after rendering",
                 "high",
                 (
@@ -211,6 +212,7 @@ def findings_for_page(page: PageResult) -> list[dict]:
             build_finding(
                 _finding_id("HTTP-ERROR", page_url),
                 page_url,
+                "crawlability",
                 "Page returned an HTTP error",
                 "high" if page.status_code >= 500 else "medium",
                 f"{page_url} returned HTTP {page.status_code}",

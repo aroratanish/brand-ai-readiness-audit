@@ -1,4 +1,6 @@
 import sys
+import time
+import re
 from collections import deque
 from urllib.parse import urlparse
 
@@ -18,6 +20,7 @@ from .render_diff_analyzer import RenderDiffAnalyzer
 from .metadata_analyzer import MetadataAnalyzer
 from .canonical_analyzer import CanonicalAnalyzer
 from .jsonld_analyzer import JSONLDAnalyzer
+from .page_type_classifier import PageTypeClassifier
 
 
 class WebsiteCrawler:
@@ -26,10 +29,18 @@ class WebsiteCrawler:
         self,
         max_pages: int = 30,
         max_depth: int = 3,
+        max_requests: int = 120,
+        max_seconds: float = 240.0,
+        max_rendered_pages: int = 8,
     ):
 
         self.max_pages = max_pages
         self.max_depth = max_depth
+        self.max_requests = max_requests
+        self.max_seconds = max_seconds
+        self.max_rendered_pages = max_rendered_pages
+        self._request_count = 0
+        self._rendered_page_count = 0
 
         self.client = HTTPClient()
 
@@ -54,11 +65,47 @@ class WebsiteCrawler:
         self.jsonld_analyzer = (
             JSONLDAnalyzer()
         )
+        self.page_type_classifier = PageTypeClassifier()
+
+    @staticmethod
+    def _priority(url: str, depth: int) -> tuple[int, int, str]:
+        """Prioritize pages likely to contain high-value audit evidence."""
+        path = urlparse(url).path.lower()
+        score = 0
+        patterns = {
+            r"^/?$": 100, r"/(product|products|item|items)(/|$)": 90,
+            r"/(pricing|plans?|price)(/|$)": 88, r"/(service|services|solution|solutions)(/|$)": 84,
+            r"/(contact|contact-us)(/|$)": 80, r"/(about|about-us|company)(/|$)": 72,
+            r"/(faq|faqs)(/|$)": 68, r"/(docs?|documentation|help|guides?)(/|$)": 60,
+            r"/(blog|article|articles|news|posts?)(/|$)": 40,
+        }
+        for pattern, weight in patterns.items():
+            if re.search(pattern, path):
+                score = max(score, weight)
+        score += max(0, 20 - depth * 5)
+        return (-score, depth, url)
+
+    def _pop_next(self, queue):
+        items = list(queue)
+        queue.clear()
+        if not items:
+            return None
+        items.sort(key=lambda item: self._priority(item[0], item[1]))
+        selected = items.pop(0)
+        queue.extend(items)
+        return selected
 
     def crawl(
         self,
         start_url: str
     ):
+
+        # --------------------------------------------------
+        # RESET REQUEST BUDGET
+        # --------------------------------------------------
+        self._request_count = 0
+        self._rendered_page_count = 0
+        crawl_started = time.monotonic()
 
         # --------------------------------------------------
         # NORMALIZE START URL
@@ -125,6 +172,14 @@ class WebsiteCrawler:
 
             "sitemaps_checked": 0,
             "sitemap_urls_discovered": 0,
+            "request_budget": self.max_requests,
+            "requests_used": 0,
+            "request_budget_exhausted": False,
+            "runtime_budget_seconds": self.max_seconds,
+            "runtime_budget_exhausted": False,
+            "render_budget": self.max_rendered_pages,
+            "renders_used": 0,
+            "render_budget_exhausted": False,
         }
 
         # --------------------------------------------------
@@ -340,9 +395,14 @@ class WebsiteCrawler:
             < self.max_pages
         ):
 
-            current_url, depth = (
-                queue.popleft()
-            )
+            next_item = self._pop_next(queue)
+            if next_item is None:
+                break
+            current_url, depth = next_item
+
+            if time.monotonic() - crawl_started >= self.max_seconds:
+                stats["runtime_budget_exhausted"] = True
+                break
 
             # Already crawled
             if current_url in visited:
@@ -404,6 +464,11 @@ class WebsiteCrawler:
             # FETCH PAGE
             # --------------------------------------------------
 
+            if self._request_count >= self.max_requests:
+                stats["request_budget_exhausted"] = True
+                break
+
+            self._request_count += 1
             response = self.client.fetch(
                 current_url
             )
@@ -589,6 +654,11 @@ class WebsiteCrawler:
             )
 
             # --------------------------------------------------
+            # PAGE TYPE CLASSIFICATION
+            # --------------------------------------------------
+            page.technical_evidence["page_type"] = self.page_type_classifier.classify(page)
+
+            # --------------------------------------------------
             # BROWSER RENDERING
             # --------------------------------------------------
 
@@ -597,17 +667,23 @@ class WebsiteCrawler:
                 or page.url
             )
 
-            render_result = (
-                self.renderer.render(
-                    render_url
-                )
-            )
+            if self._rendered_page_count >= self.max_rendered_pages:
+                stats["render_budget_exhausted"] = True
+                page.technical_evidence["render"] = {
+                    "status": "skipped",
+                    "evidence": {"reason": "render_budget_exhausted", "budget": self.max_rendered_pages},
+                }
+                render_result = None
+            else:
+                self._rendered_page_count += 1
+                stats["renders_used"] = self._rendered_page_count
+                render_result = self.renderer.render(render_url)
 
             # --------------------------------------------------
             # RENDERING FAILED
             # --------------------------------------------------
 
-            if render_result.error:
+            if render_result is not None and render_result.error:
 
                 page.errors.append(
                     f"Renderer: "
@@ -631,7 +707,7 @@ class WebsiteCrawler:
             # RENDERING SUCCESSFUL
             # --------------------------------------------------
 
-            else:
+            elif render_result is not None:
 
                 page.rendered_html = (
                     render_result.rendered_html
@@ -720,7 +796,11 @@ class WebsiteCrawler:
                 # ----------------------------------------------
                 # CHECK LINK
                 # ----------------------------------------------
+                if self._request_count >= self.max_requests:
+                    stats["request_budget_exhausted"] = True
+                    break
 
+                self._request_count += 1
                 link_result = (
                     self.link_checker.check(
                         link
@@ -976,6 +1056,10 @@ class WebsiteCrawler:
         # --------------------------------------------------
         # RETURN RESULT
         # --------------------------------------------------
+
+        stats["requests_used"] = self._request_count
+        stats["runtime_seconds"] = round(time.monotonic() - crawl_started, 3)
+        stats["renders_used"] = self._rendered_page_count
 
         return {
             "pages": pages,

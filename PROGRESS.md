@@ -88,3 +88,35 @@ tests/
 5. Expand site-level corroboration when independent sources are available.
 6. Add broader fixture sites for adaptive page-type sampling and render-diff regression coverage.
 7. Add scoring only when a scoring contract is defined.
+## Round 3 hardening pass — 2026-09-13
+
+Completed in the current repository:
+- Fixed render-only and HTTP-error finding adapter argument-order bugs.
+- Added the `ai-discoverability-audit` specialist skill and registered it in `marketplace.json`.
+- Integrated page-level and site-level AI discoverability checks into the entrypoint.
+- Added evidence-backed structured product price visibility checks.
+- Added cross-page structured product price conflict detection.
+- Added conservative cross-page organization identity conflict detection with alias false-positive protection.
+- Added a proactive entity-linking (`sameAs`) opportunity.
+- Strengthened engagement detection around actionable controls and forms.
+- Added HTTP request budgeting to the crawler and exposed crawl-budget statistics.
+- Added report `analysis` metadata for category distribution and proactive opportunity count.
+- Added regression/integration tests for the new and previously untested runtime branches.
+
+Validation: 70 repository tests pass; Python modules compile successfully; marketplace manifest has exactly one entrypoint and every listed skill contains a `SKILL.md`.
+
+## Round 3 completion pass — Steps 1–10
+
+Completed:
+1. Integrated technical analyzer evidence into entrypoint findings, including title/description range signals, invalid/cross-domain canonical, invalid JSON-LD, render failures, and broken-link evidence.
+2. Expanded freshness/corroboration with availability conflicts, conservative policy-year review signals, and existing stale-date protection.
+3. Strengthened engagement detection for empty action destinations and concrete contact mechanisms while preserving context-aware false-positive boundaries.
+4. Added deterministic AI answerability checks for high-intent pages and kept recommendations evidence-backed.
+5. Added cross-page first-party organization and product-price consistency checks.
+6. Added semantic render-only filtering so low-value JS changes are not automatically reported as high-impact discoverability defects.
+7. Added six generalization fixtures and regression tests covering healthy, JS-heavy, commerce, stale, conflict, and engagement patterns.
+8. Added crawl runtime and rendering budgets plus runtime statistics.
+9. Added confidence/evidence-strength metadata and report distributions.
+10. Added adaptive URL prioritization for homepage, product, pricing, service, contact, about, FAQ, documentation, and article paths.
+
+Validation after this pass: 107 pytest tests passed; Python sources compile successfully.

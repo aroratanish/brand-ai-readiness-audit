@@ -73,7 +73,22 @@ class Round3IntegrationTests(unittest.TestCase):
         self.assertIn("engagement-audit", sources)
         self.assertIn("freshness-corroboration", sources)
         self.assertEqual(report["summary"]["total_findings"], len(report["findings"]))
+        self.assertIn("by_category", report["analysis"])
+        self.assertIn("opportunities", report["analysis"])
         self.assertEqual(report["coverage"]["pages_discovered"], 4)
+
+    def test_ai_discoverability_is_composed_into_report(self):
+        page = PageResult(
+            url="https://example.com/product/widget",
+            depth=0,
+            raw_html="<h1>Widget</h1><p>Great widget</p>",
+            json_ld=[{"@type": "Product", "name": "Widget", "offers": {"price": "99", "priceCurrency": "USD"}}],
+        )
+        crawler = Mock()
+        crawler.crawl.return_value = [page]
+        report = audit_site_report("https://example.com", crawler=crawler)
+        sources = {item["source_skill"] for item in report["findings"]}
+        self.assertIn("ai-discoverability-audit", sources)
 
     def test_manifest_has_one_entrypoint_and_all_skill_paths(self):
         manifest = json.loads((ROOT / "marketplace.json").read_text())

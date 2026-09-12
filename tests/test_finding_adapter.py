@@ -167,3 +167,21 @@ class FindingAdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class RuntimeBranchRegressionTests(unittest.TestCase):
+    def test_render_only_branch_has_valid_severity(self):
+        from skills.crawl_render_audit.scripts.finding_adapter import findings_for_page
+        from skills.crawl_render_audit.scripts.models import PageResult
+        page = PageResult(url="https://example.com", depth=0, raw_html="<h1>x</h1>")
+        page.technical_evidence = {"raw_vs_rendered": {"status": "rendered_content_added", "evidence": {"text_delta": 120}}}
+        findings = findings_for_page(page)
+        render = next(f for f in findings if f["title"] == "Important page content appears only after rendering")
+        self.assertEqual(render["severity"], "high")
+
+    def test_http_error_branch_has_valid_severity(self):
+        from skills.crawl_render_audit.scripts.finding_adapter import findings_for_page
+        from skills.crawl_render_audit.scripts.models import PageResult
+        page = PageResult(url="https://example.com/missing", depth=1, status_code=404)
+        findings = findings_for_page(page)
+        http = next(f for f in findings if f["title"] == "Page returned an HTTP error")
+        self.assertEqual(http["severity"], "medium")

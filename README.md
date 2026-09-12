@@ -14,15 +14,16 @@ direct visitors.
 - **Engagement Audit**: checks direct-page orientation, context retention,
   decision information, relevant CTAs, contact paths, and internal discovery.
 - **Freshness Corroboration**: evaluates supported date signals conservatively.
+- **AI Discoverability Audit**: checks machine-readable answerability, structured-data versus visible facts, entity consistency, and proactive AI-readiness opportunities.
 
 ## Architecture
 
 ```text
 URL -> bounded crawler/renderer -> PageResult/site evidence
-                                  |       |       |       |
-                         technical  engagement freshness entity/trust
-                                  \       |       |       /
-                             normalize -> deduplicate -> report
+                                  |       |       |       |       |
+                         technical  engagement freshness entity  AI-discoverability
+                                  \       |       |       |       /
+                              normalize -> deduplicate -> report
 ```
 
 ## Setup and execution
@@ -63,3 +64,8 @@ reported as defects.
 ```bash
 PYTHONPATH=. .venv/bin/python -m unittest discover -s tests -q
 ```
+## Round 3 hardening status
+
+The entrypoint now composes technical, freshness, engagement, AI-discoverability, render-semantic, and cross-page consistency findings. Reports include coverage, confidence/evidence-strength distributions, and a transparent heuristic readiness score. The crawler uses adaptive high-value URL prioritization, request/runtime/render budgets, robots enforcement, and read-only behavior. Generalization fixtures cover healthy, JS-heavy, commerce, stale, conflict, and engagement scenarios.
+
+Known intentional limitations: independent external corroboration is not asserted unless an external evidence provider is added; missing `llms.txt` is not treated as a defect; missing dates are not treated as proof of staleness; and client-side rendering is treated as a risk only when the rendered-only evidence appears materially decision-relevant.

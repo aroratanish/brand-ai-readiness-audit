@@ -38,6 +38,15 @@
       "entrypoint": false,
       "status": "implemented",
       "description": "Detects supported stale freshness signals without treating missing dates as proof of staleness."
+    },
+    {
+      "id": "ai-discoverability-audit",
+      "name": "AI Discoverability Audit",
+      "path": "skills/ai_discoverability_audit/",
+      "module": "skills.ai_discoverability_audit",
+      "entrypoint": false,
+      "status": "implemented",
+      "description": "Checks machine-readable answerability, structured-data versus visible facts, entity consistency, and proactive AI-readiness opportunities."
     }
   ]
 }

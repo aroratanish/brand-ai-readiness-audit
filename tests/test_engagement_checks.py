@@ -1,3 +1,4 @@
+import unittest
 from skills.engagement_audit.scripts.engagement_checks import run_checks
 
 
@@ -230,3 +231,18 @@ def test_unknown_context_does_not_trigger_context_gated_checks():
     assert "EN-08" not in ids
     assert "EN-10" not in ids
     assert "EN-12" not in ids
+
+class EngagementActionabilityRegressionTests(unittest.TestCase):
+    def test_contact_class_name_does_not_fake_contact_path(self):
+        from skills.engagement_audit import findings_for_page
+        from skills.crawl_render_audit.scripts.models import PageResult
+        page = PageResult(url="https://example.com/contact", depth=1, raw_html='<div class="contact-card">Reach our team</div>')
+        findings = findings_for_page(page)
+        self.assertTrue(any("actionable contact path" in f["title"] for f in findings))
+
+    def test_form_without_submit_is_flagged(self):
+        from skills.engagement_audit import findings_for_page
+        from skills.crawl_render_audit.scripts.models import PageResult
+        page = PageResult(url="https://example.com/signup", depth=1, raw_html='<h1>Sign up</h1><form><input name="email"></form>')
+        findings = findings_for_page(page)
+        self.assertTrue(any("submit control" in f["title"] for f in findings))
