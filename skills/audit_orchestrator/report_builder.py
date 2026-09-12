@@ -21,7 +21,7 @@ def _utc_timestamp() -> str:
     )
 
 
-def build_report(url: str, findings: list[dict]) -> dict:
+def build_report(url: str, findings: list[dict], coverage: dict | None = None) -> dict:
     """Build a canonical report from final deduplicated findings."""
     finding_list = list(findings)
     counts = {severity: 0 for severity in SEVERITY_KEYS}
@@ -30,7 +30,7 @@ def build_report(url: str, findings: list[dict]) -> dict:
         severity = validate_finding_severity(finding)
         counts[severity] += 1
 
-    return {
+    report = {
         "site": _site_name(url),
         "audited_at": _utc_timestamp(),
         "summary": {
@@ -39,3 +39,6 @@ def build_report(url: str, findings: list[dict]) -> dict:
         },
         "findings": finding_list,
     }
+    if coverage:
+        report["coverage"] = coverage
+    return report

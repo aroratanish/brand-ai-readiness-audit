@@ -1,6 +1,7 @@
 import hashlib
 
 from .models import PageResult
+from .entity_analyzer import analyze_entity
 from .url_utils import normalize_url
 from shared.severity_policy import normalize_severity
 
@@ -165,6 +166,56 @@ def findings_for_page(page: PageResult) -> list[dict]:
                 f"Malformed JSON-LD found on {page_url}",
                 "Invalid structured data may prevent search engines and AI systems from interpreting important page information.",
                 "Correct the JSON-LD syntax and validate it against the intended schema.",
+            )
+        )
+
+    entity_signal = analyze_entity(page)
+    if entity_signal:
+        findings.append(
+            build_finding(
+                _finding_id("ENTITY-MISMATCH", page_url),
+                page_url,
+                "entity-trust",
+                "Entity identity is inconsistent across page signals",
+                "medium",
+                (
+                    f"Visible identity {entity_signal['visible_name']!r} differs from "
+                    f"Organization schema name {entity_signal['schema_name']!r} on {page_url}"
+                ),
+                "Conflicting identity signals make it harder for AI systems and visitors to determine which organization the page represents.",
+                "Align visible branding, metadata, and Organization JSON-LD, or document the relationship between distinct brands.",
+            ) | {"confidence": entity_signal["confidence"]}
+        )
+
+    evidence = getattr(page, "technical_evidence", {}) or {}
+    render_diff = evidence.get("raw_vs_rendered", {})
+    if render_diff.get("status") == "rendered_content_added":
+        diff_evidence = render_diff.get("evidence", {})
+        findings.append(
+            build_finding(
+                _finding_id("RENDER-ONLY", page_url),
+                page_url,
+                "Important page content appears only after rendering",
+                "high",
+                (
+                    f"Rendered text added {diff_evidence.get('text_delta', 'unknown')} characters "
+                    f"on {page_url}; raw HTML does not contain the same visible content"
+                ),
+                "Some crawlers and AI systems read the initial HTML without executing JavaScript, so important facts may be missed.",
+                "Publish essential facts and actions in server-rendered HTML, with JavaScript as an enhancement.",
+            )
+        )
+
+    if page.status_code is not None and page.status_code >= 400:
+        findings.append(
+            build_finding(
+                _finding_id("HTTP-ERROR", page_url),
+                page_url,
+                "Page returned an HTTP error",
+                "high" if page.status_code >= 500 else "medium",
+                f"{page_url} returned HTTP {page.status_code}",
+                "HTTP errors prevent visitors and machine readers from retrieving the page reliably.",
+                "Repair the endpoint or redirect it to the correct live URL, then verify the response status.",
             )
         )
 

@@ -1,24 +1,43 @@
 {
   "name": "brand-ai-readiness-audit",
+  "version": "1.0.0",
+  "description": "Read-only agent skills for evidence-backed AI discoverability, engagement, freshness, and entity trust audits.",
   "skills": [
     {
-      "name": "audit-orchestrator",
+      "id": "audit-orchestrator",
+      "name": "Audit Orchestrator",
       "path": "skills/audit_orchestrator/",
       "module": "skills.audit_orchestrator",
+      "entrypoint": true,
       "status": "implemented",
-      "description": "Runs the P1 audit pipeline and produces validated, deduplicated findings and reports."
+      "description": "Composes crawl/render, discoverability, engagement, freshness, and trust checks into one report."
     },
     {
-      "name": "freshness-corroboration",
-      "path": "skills/freshness_corroboration/",
-      "status": "placeholder",
-      "description": "P3 freshness and information trust skill placeholder; implementation is deferred."
+      "id": "crawl-render-audit",
+      "name": "Crawl Render Audit",
+      "path": "skills/crawl_render_audit/",
+      "module": "skills.crawl_render_audit.scripts.audit",
+      "entrypoint": false,
+      "status": "implemented",
+      "description": "Crawls a public site while respecting robots, analyzes HTTP, metadata, structured data, rendering, and coverage signals."
     },
     {
-      "name": "engagement-audit",
+      "id": "engagement-audit",
+      "name": "Engagement Audit",
       "path": "skills/engagement_audit/",
-      "status": "placeholder",
-      "description": "P3 user and AI engagement skill placeholder; implementation is deferred."
+      "module": "skills.engagement_audit",
+      "entrypoint": false,
+      "status": "implemented",
+      "description": "Checks context retention, orientation, decision paths, contact actions, and relevant next steps."
+    },
+    {
+      "id": "freshness-corroboration",
+      "name": "Freshness Corroboration",
+      "path": "skills/freshness_corroboration/",
+      "module": "skills.freshness_corroboration",
+      "entrypoint": false,
+      "status": "implemented",
+      "description": "Detects supported stale freshness signals without treating missing dates as proof of staleness."
     }
   ]
 }

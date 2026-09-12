@@ -1,45 +1,31 @@
+---
+name: audit-orchestrator
+description: Compose all read-only website audit skills into one normalized report.
+---
+
 # Audit Orchestrator
 
-## Purpose
+## When to use
+Use for a complete audit of any public HTTP(S) website when one report must
+cover discoverability, engagement, freshness, and entity trust.
 
-Run the shared audit pipeline and return findings from the available audit
-providers.
+## Inputs
+- `url`: public site URL.
+- Optional injected crawler or providers for tests and controlled integrations.
 
-## Interface
+## Procedure
+1. Crawl with `WebsiteCrawler`, respecting robots, same-host boundaries, depth,
+   page, and request limits.
+2. Pass every `PageResult` to crawl/render, freshness, engagement, and entity
+   checks.
+3. Validate finding fields, normalize severity, and conservatively deduplicate.
+4. Emit `audit_site_report(url)` with summary counts and coverage metadata.
 
-Use `skills.audit_orchestrator.audit_site(url)`.
+## Outputs
+`audit_site(url)` returns findings. `audit_site_report(url)` returns the minimum
+report envelope in `shared/report_schema.md`, including `site`, `audited_at`,
+`summary`, and `findings`.
 
-Use `skills.audit_orchestrator.audit_site_report(url)` when the canonical report
-envelope is needed. The original findings-list interface remains available.
-
-The input is a site URL. The output is a predictable list of findings using the
-canonical structure documented in `shared/finding_schema.md`.
-
-## Responsibilities
-
-- Use the existing P2 `WebsiteCrawler` to obtain `PageResult` objects.
-- Pass every `PageResult` through the P1 finding adapter.
-- Collect findings from crawl, freshness, and engagement providers.
-- Validate and normalize every finding severity before returning findings.
-- Deduplicate compatible findings by effective URL, category, and normalized title.
-- Preserve each producer's `source_skill` value.
-- Build the canonical report envelope from final deduplicated findings when
-	`audit_site_report` is used.
-
-## Temporary P3 Stubs
-
-- `freshness_stub(url) -> []`
-- `engagement_stub(url) -> []`
-
-The providers are injectable into `audit_site` so the real P3 implementations
-can replace them later without changing the pipeline shape.
-
-## Current Limitations
-
-- Freshness and engagement detection are not implemented.
-- Findings are not scored, and the report does not provide a score.
-- Deduplication is intentionally conservative and does not merge findings with
-	different severities.
-- Broken internal-link detection remains deferred because `PageResult` does not
-	contain per-link HTTP status information.
-- P2 HTTP 4xx/5xx handling remains unchanged.
+## Safety
+This skill is read-only. It performs unauthenticated inspection, applies crawl
+limits, honors robots.txt, never submits forms, and does not modify a live site.

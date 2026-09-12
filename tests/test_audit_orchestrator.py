@@ -55,6 +55,67 @@ class AuditOrchestratorTests(unittest.TestCase):
             )
         )
 
+    def test_freshness_provider_receives_each_page(self):
+        freshness_provider = Mock(return_value=[])
+
+        audit_site(
+            "https://example.com",
+            crawler=self.crawler,
+            freshness_provider=freshness_provider,
+        )
+
+        freshness_provider.assert_called_once_with(self.page)
+
+    def test_real_freshness_findings_appear_with_crawl_findings(self):
+        page = PageResult(
+            url="https://example.com",
+            depth=0,
+            h1=["Example page"],
+            json_ld=[{"@type": "Article", "dateModified": "2020-01-01"}],
+        )
+        crawler = Mock()
+        crawler.crawl.return_value = [page]
+
+        findings = audit_site("https://example.com", crawler=crawler)
+
+        titles = {finding["title"] for finding in findings}
+        self.assertIn("Missing meta description", titles)
+        self.assertIn("Stale JSON-LD freshness signal", titles)
+
+    def test_freshness_output_matches_finding_schema(self):
+        page = PageResult(
+            url="https://example.com",
+            depth=0,
+            json_ld=[{"datePublished": "2020-01-01"}],
+        )
+        crawler = Mock()
+        crawler.crawl.return_value = [page]
+
+        findings = audit_site("https://example.com", crawler=crawler)
+
+        freshness_findings = [
+            finding
+            for finding in findings
+            if finding["source_skill"] == "freshness-corroboration"
+        ]
+        self.assertEqual(len(freshness_findings), 1)
+        for finding in freshness_findings:
+            self.assertTrue({
+                "id",
+                "source_skill",
+                "url",
+                "category",
+                "title",
+                "severity",
+                "evidence",
+                "why_it_matters",
+                "suggested_action",
+            }.issubset(finding))
+            self.assertTrue({
+                "summary",
+                "priority",
+            }.issubset(finding["suggested_action"]))
+
     def test_invalid_provider_severity_is_rejected(self):
         invalid_finding = {
             "id": "F-INVALID",

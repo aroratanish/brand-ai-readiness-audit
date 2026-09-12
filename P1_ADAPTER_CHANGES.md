@@ -10,10 +10,10 @@ Implemented the PageResult-to-Finding adapter.
 - Integrated findings into the audit CLI output.
 - Updated `PROGRESS.md` and completed the shared finding schema documentation.
 
-## Deferred
+## Historical limitations
 
 - Broken internal-link detection remains deferred because `PageResult` does not include per-link HTTP status codes.
-- The orchestrator and P3 skills were not implemented.
+- The original adapter did not include the later orchestrator and P3 integrations; those are now implemented in the marketplace.
 - P2 crawler code was left unchanged.
 
 ## Validation
