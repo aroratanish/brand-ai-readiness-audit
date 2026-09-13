@@ -64,8 +64,9 @@ class HTTPClient:
                 in content_type
             )
 
+            request_succeeded = response.status_code < 400
             return {
-                "success": True,
+                "success": request_succeeded,
                 "status_code": response.status_code,
                 "requested_url": url,
                 "final_url": response.url,
@@ -83,7 +84,11 @@ class HTTPClient:
                 "headers": dict(
                     response.headers
                 ),
-                "error": None,
+                "error": (
+                    None
+                    if request_succeeded
+                    else f"HTTP {response.status_code}"
+                ),
             }
 
         except requests.RequestException as exc:

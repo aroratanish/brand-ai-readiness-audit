@@ -13,6 +13,15 @@ Audit reports use this canonical structure:
     "medium": 3,
     "low": 0
   },
+  "score": {
+    "overall": 100,
+    "dimensions": {
+      "discoverability": 100,
+      "freshness": 100,
+      "engagement": 100,
+      "trust": 100
+    }
+  },
   "findings": [
     {
       "id": "F-001",
@@ -49,3 +58,7 @@ Audit reports use this canonical structure:
 Summary values are calculated from the actual findings and are not hardcoded.
 The report builder validates each finding severity using the shared severity
 policy before counting it.
+
+The score is calculated after finding validation and deduplication using the
+rules in [`scoring_rules.md`](scoring_rules.md). It summarizes inspected audit
+evidence and does not represent actual search or LLM rankings.

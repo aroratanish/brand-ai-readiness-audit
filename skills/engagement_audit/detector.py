@@ -22,7 +22,18 @@ def _page_context(page: PageResult) -> dict[str, Any]:
     if isinstance(page_type, dict):
         primary = page_type.get("primary_type")
         confidence = page_type.get("confidence")
-        if primary in {"product", "pricing", "contact"} and confidence in {"high", "medium"}:
+        supporting = set(page_type.get("supporting_types") or [])
+        url_path = str(getattr(page, "url", "") or "").lower()
+        product_like_path = any(token in url_path for token in ("/product", "/products", "/shop", "/store"))
+
+        if (
+            primary in {"product", "pricing", "contact"}
+            and confidence in {"high", "medium"}
+        ) or (
+            "product" in supporting and confidence in {"high", "medium", "low"}
+        ) or (
+            product_like_path and confidence in {"high", "medium", "low"}
+        ):
             evidence["high_intent"] = True
 
     return evidence

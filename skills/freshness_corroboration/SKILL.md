@@ -22,6 +22,11 @@ freshness threshold. Missing dates are not treated as stale.
 `findings_for_page(page)` returns canonical freshness findings only when the
 observed evidence supports them.
 
+The orchestrator uses `skills.freshness_corroboration.findings_for_page` as the
+production entry point. The dependency-free helpers under `scripts/` operate
+on explicitly normalized logical evidence and are not invoked directly with
+raw `PageResult` objects.
+
 ## Safety
 Read-only analysis. Repeated first-party statements are not independent
 corroboration, and no external claim is asserted without fetched evidence.

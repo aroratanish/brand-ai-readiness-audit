@@ -27,6 +27,16 @@ fixes; it never changes a live site.
   structured-data versus visible facts, entity consistency, and proactive
   AI-readiness opportunities.
 
+## Directory structure
+
+```text
+marketplace.json       marketplace manifest
+shared/                finding, report, severity, and false-positive contracts
+skills/                orchestrator and specialist skills
+tests/                 unit and integration regression tests
+research/              P3 research and sampling notes
+```
+
 ## Architecture
 
 ```text
@@ -57,7 +67,7 @@ Validation → deduplication → confidence/evidence strength
 Single structured audit report
 ```
 
-## Setup
+## Setup and execution
 
 ```bash
 python3 -m venv .venv
@@ -65,9 +75,31 @@ python3 -m venv .venv
 .venv/bin/python -m playwright install chromium  # optional browser rendering
 ```
 
-## Run
+The core installation uses `requests`, `beautifulsoup4`, `lxml`, and the optional
+browser stack for rendering. Without Playwright, the crawler still performs the
+bounded HTTP audit and records rendering as unavailable.
 
-Canonical marketplace report:
+### Canonical entrypoint
+
+```bash
+python -m skills.audit_orchestrator.cli https://example.com
+python -m skills.audit_orchestrator.cli --format text https://example.com
+```
+
+When running inside a project virtual environment, the equivalent commands are:
+
+```bash
+PYTHONPATH=. .venv/bin/python -m skills.audit_orchestrator.cli https://example.com
+PYTHONPATH=. .venv/bin/python -m skills.audit_orchestrator.cli --format text https://example.com
+```
+
+### Crawl-only CLI
+
+```bash
+PYTHONPATH=. .venv/bin/python -m skills.crawl_render_audit.scripts.audit https://example.com
+```
+
+### Canonical JSON report via module
 
 ```bash
 PYTHONPATH=. python -c 'from skills.audit_orchestrator import audit_site_report; import json, sys; print(json.dumps(audit_site_report(sys.argv[1]), indent=2))' https://example.com
@@ -120,6 +152,38 @@ action, and ranking metadata. Additional sections include coverage,
 `readiness_score`, `referral_journey`, `evidence_graph`, `recommendations`, and
 `external_corroboration`.
 
+Example report shape:
+
+```json
+{
+  "site": "example.com",
+  "audited_at": "2026-09-13T12:00:00Z",
+  "summary": {"total_findings": 1, "critical": 0, "high": 1, "medium": 0, "low": 0},
+  "score": {"overall": 88, "dimensions": {"engagement": 88}},
+  "findings": []
+}
+```
+
+Severity is centralized: `critical` indicates a demonstrably site-wide blocker,
+`high` a major page or journey failure, `medium` a meaningful issue, and `low`
+a limited-impact issue. Every finding includes deterministic evidence and a
+suggested action with matching priority.
+
+The readiness score starts at 100 and subtracts 25/12/5/2 points for each
+final deduplicated critical/high/medium/low finding. Scores are clamped to
+0-100; dimension scores apply the same penalties to implemented dimensions.
+Zero findings produce 100. The score summarizes inspected evidence and does not
+measure search rankings, LLM rankings, citation probability, or conversion
+rates.
+
+The P1/P3 flow is:
+
+```text
+PageResult -> crawl findings -> freshness findings -> engagement findings
+           -> entity/trust findings -> severity validation -> deduplication
+           -> report builder
+```
+
 ## Safety and limits
 
 - Recommend-only and read-only.
@@ -137,11 +201,12 @@ action, and ranking metadata. Additional sections include coverage,
 Run the full suite:
 
 ```bash
-PYTHONPATH=. python -m pytest
+PYTHONPATH=. python -m pytest -q
 ```
 
-The current suite covers **122 tests plus 7 subtests**, including adversarial
-false-positive cases and generalized fixture sites.
+The current suite covers the repository's deterministic regression coverage,
+including engagement evidence-gating, report generation, scoring, and general
+fixture validation.
 
 Static final-submission audit:
 
@@ -183,3 +248,13 @@ brand-ai-readiness-audit/
 
 The marketplace manifest has exactly one entrypoint and every listed skill has
 its own `SKILL.md`.
+=======
+PYTHONPATH=. .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q
+```
+
+Current limitations: external corroboration, persistence, dashboards,
+authentication, and deployment infrastructure are intentionally out of scope.
+HTTP 4xx/5xx responses are retained as crawled `PageResult` entries with
+`success=False`, an HTTP error in `errors`, and normalized technical findings;
+redirects and other status codes below 400 remain successful.
+>>>>>>> d0e427b (feat: finalize Adobe Round 3 skill marketplace)

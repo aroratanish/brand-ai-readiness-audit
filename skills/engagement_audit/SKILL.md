@@ -174,3 +174,7 @@ A finding must be:
 
 When required evidence cannot be established, the check returns no finding
 rather than converting `UNKNOWN` into failure.
+
+## Safety
+Read-only HTML inspection only. Never submit forms, authenticate, or modify a
+live website.

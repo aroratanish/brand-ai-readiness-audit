@@ -38,6 +38,7 @@ class ReportBuilderTests(unittest.TestCase):
             "low": 0,
         })
         self.assertEqual(report["findings"], [])
+        self.assertEqual(report["score"]["overall"], 100)
 
     def test_one_finding_is_counted_and_preserved(self):
         findings = [make_finding("F-001", "high")]
@@ -67,6 +68,15 @@ class ReportBuilderTests(unittest.TestCase):
             "medium": 3,
             "low": 0,
         })
+
+    def test_score_uses_final_findings(self):
+        findings = [make_finding("F-001", "high")]
+        findings[0]["category"] = "engagement"
+
+        report = build_report("https://example.com", findings)
+
+        self.assertEqual(report["score"]["overall"], 88)
+        self.assertEqual(report["score"]["dimensions"]["engagement"], 88)
 
     def test_audited_at_is_utc_iso8601(self):
         report = build_report("https://example.com", [])

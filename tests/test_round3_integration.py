@@ -3,10 +3,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
-from skills.audit_orchestrator import audit_site_report
+from skills.audit_orchestrator import audit_site, audit_site_report
+from skills.crawl_render_audit.scripts.finding_adapter import findings_for_page
 from skills.crawl_render_audit.scripts.models import PageResult
 from skills.engagement_audit import findings_for_page as engagement_findings_for_page
-from skills.crawl_render_audit.scripts.finding_adapter import findings_for_page
 
 
 ROOT = Path(__file__).parents[1]
@@ -89,6 +89,39 @@ class Round3IntegrationTests(unittest.TestCase):
         report = audit_site_report("https://example.com", crawler=crawler)
         sources = {item["source_skill"] for item in report["findings"]}
         self.assertIn("ai-discoverability-audit", sources)
+
+    def test_findings_only_api_runs_real_freshness_and_engagement_providers(self):
+        page = PageResult(
+            url="https://example.com/product/platform",
+            depth=1,
+            raw_html="<h1>Platform</h1><p>Product information.</p>",
+            json_ld=[{"@type": "Article", "datePublished": "2020-01-01"}],
+        )
+        crawler = Mock()
+        crawler.crawl.return_value = [page]
+
+        findings = audit_site("https://example.com", crawler=crawler)
+        sources = {item["source_skill"] for item in findings}
+
+        self.assertIn("freshness-corroboration", sources)
+        self.assertIn("engagement-audit", sources)
+
+    def test_date_published_is_used_by_the_default_freshness_provider(self):
+        page = PageResult(
+            url="https://example.com/article/guide",
+            depth=1,
+            json_ld=[{"@type": "Article", "datePublished": "2020-01-01"}],
+        )
+        crawler = Mock()
+        crawler.crawl.return_value = [page]
+
+        findings = audit_site_report("https://example.com", crawler=crawler)["findings"]
+
+        self.assertTrue(any(
+            item["source_skill"] == "freshness-corroboration"
+            and "datePublished" in item["evidence"]
+            for item in findings
+        ))
 
     def test_manifest_has_one_entrypoint_and_all_skill_paths(self):
         manifest = json.loads((ROOT / "marketplace.json").read_text())

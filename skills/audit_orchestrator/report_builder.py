@@ -1,7 +1,8 @@
+from collections import Counter
 from datetime import datetime, timezone
 from urllib.parse import urlparse
-from collections import Counter
 
+from shared.scoring import score_findings
 from shared.severity_policy import validate_finding_severity
 
 
@@ -49,6 +50,7 @@ def build_report(url: str, findings: list[dict], coverage: dict | None = None) -
             "by_confidence": dict(sorted(confidence_counts.items())),
             "by_evidence_strength": dict(sorted(evidence_strength_counts.items())),
         },
+        "score": score_findings(finding_list),
         "findings": finding_list,
     }
     if coverage:

@@ -21,14 +21,18 @@ cover discoverability, engagement, freshness, and entity trust.
 3. Validate finding fields, normalize severity, and conservatively deduplicate.
 4. Rank actions by transparent impact × effort heuristics.
 5. Build the AI referral journey, evidence graph, and readiness score.
-6. Optionally corroborate against a small bounded set of already-linked public external pages.
-7. Emit `audit_site_report(url)` with summary counts, coverage, rankings, journey, graph, and safety metadata.
+6. Optionally corroborate against a small bounded set of already-linked public
+   external pages.
+7. Emit `audit_site_report(url)` with summary counts, coverage, rankings,
+   journey, graph, and safety metadata.
 
 ## Outputs
-`audit_site(url)` returns findings. `audit_site_report(url)` returns the minimum
-report envelope in `shared/report_schema.md`, including `site`, `audited_at`,
-`summary`, and `findings`, plus coverage, readiness scoring, referral journey,
-evidence graph, ranked recommendations, and optional external corroboration.
+`audit_site(url)` returns findings. `audit_site_report(url)` returns the final
+marketplace report envelope in `shared/report_schema.md`, including `site`,
+`audited_at`, `summary`, `score`, `coverage`, and `findings`, plus readiness
+scoring, referral journey, evidence graph, ranked recommendations, and optional
+external corroboration. Use `python -m skills.audit_orchestrator.cli URL --format text`
+for a human-readable summary.
 
 ## Safety
 This skill is read-only. It performs unauthenticated inspection, applies crawl
