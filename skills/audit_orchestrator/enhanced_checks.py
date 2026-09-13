@@ -189,11 +189,15 @@ def site_fact_findings(pages: list[PageResult]) -> list[dict]:
                 "Create a single current offer source and synchronize visible text, structured data, and related pages.","freshness","high"))
     # Policy pages with an explicit old visible year are surfaced as review
     # signals, never as proof of stale policy content.
-    if re.search(r"/(privacy|terms|policy|policies|returns?|refunds?)(/|$)", urlparse(url).path.lower()):
-        years=[int(y) for y in re.findall(r"\b(20\d{2})\b", text)]
-        if years and max(years) < now.year - 2:
-            findings.append(finding(url,"POLICY-REVIEW","Policy page contains an old explicit year that merits review","low",
-                f"Policy-like URL contains year(s) {sorted(set(years))[-3:]} while current audit year is {now.year}.",
+    for p in pages:
+        policy_url = p.final_url or p.url
+        if not re.search(r"/(privacy|terms|policy|policies|returns?|refunds?)(/|$)", urlparse(policy_url).path.lower()):
+            continue
+        policy_text = _visible_text(p)
+        years=[int(y) for y in re.findall(r"\b(20\d{2})\b", policy_text)]
+        if years and max(years) < datetime.now(timezone.utc).year - 2:
+            findings.append(finding(policy_url,"POLICY-REVIEW","Policy page contains an old explicit year that merits review","low",
+                f"Policy-like URL contains year(s) {sorted(set(years))[-3:]} while current audit year is {datetime.now(timezone.utc).year}.",
                 "Old visible years on policy pages can make current terms appear stale, although a year alone does not prove the policy is outdated.",
                 "Review the policy and update dates only if the underlying policy has changed.","freshness","medium"))
     return findings

@@ -13,6 +13,7 @@ from skills.freshness_corroboration import findings_for_page as freshness_findin
 from skills.ai_discoverability_audit import findings_for_page as ai_findings_for_page, findings_for_site as ai_findings_for_site
 from .enhanced_checks import technical_findings, render_semantic_findings, answerability_findings, site_fact_findings, freshness_enhanced
 from .scoring import build_score
+from .polish import build_evidence_graph, build_referral_journey, external_corroboration, rank_actions
 
 
 Finding = dict
@@ -73,6 +74,7 @@ def audit_site_report(
     crawler: WebsiteCrawler | None = None,
     freshness_provider: FreshnessProvider = freshness_findings_for_page,
     engagement_provider: PageFindingProvider = engagement_findings_for_page,
+    enable_external_corroboration: bool = False,
 ) -> dict:
     """Run the audit and wrap its findings in the canonical report."""
     site_crawler = crawler or WebsiteCrawler(max_pages=10, max_depth=2, max_requests=80)
@@ -87,8 +89,27 @@ def audit_site_report(
             "sitemaps": crawl_result.get("sitemaps", {}),
             "crawl_stats": crawl_result.get("stats", {}),
         })
-    report = build_report(url, findings, coverage=coverage)
-    report["readiness_score"] = build_score(findings, len(pages))
+    ranked = rank_actions(findings)
+    report = build_report(url, ranked, coverage=coverage)
+    report["readiness_score"] = build_score(ranked, len(pages))
+    report["referral_journey"] = build_referral_journey(pages)
+    report["evidence_graph"] = build_evidence_graph(pages)
+    report["recommendations"] = [
+        {
+            "rank": f.get("priority_rank"),
+            "finding_id": f.get("id"),
+            "title": f.get("title"),
+            "impact": f.get("impact_score"),
+            "effort": f.get("effort_score"),
+            "priority_score": f.get("priority_score"),
+            "action": f.get("suggested_action", {}).get("summary"),
+        }
+        for f in ranked[:10]
+    ]
+    report["external_corroboration"] = (
+        external_corroboration(pages) if enable_external_corroboration
+        else {"status": "disabled", "reason": "Enable explicitly to check a small bounded set of already-linked public external pages."}
+    )
     return report
 
 

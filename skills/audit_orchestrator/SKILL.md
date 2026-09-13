@@ -19,12 +19,16 @@ cover discoverability, engagement, freshness, and entity trust.
 2. Pass every `PageResult` to crawl/render, freshness, engagement, and entity
    checks.
 3. Validate finding fields, normalize severity, and conservatively deduplicate.
-4. Emit `audit_site_report(url)` with summary counts and coverage metadata.
+4. Rank actions by transparent impact × effort heuristics.
+5. Build the AI referral journey, evidence graph, and readiness score.
+6. Optionally corroborate against a small bounded set of already-linked public external pages.
+7. Emit `audit_site_report(url)` with summary counts, coverage, rankings, journey, graph, and safety metadata.
 
 ## Outputs
 `audit_site(url)` returns findings. `audit_site_report(url)` returns the minimum
 report envelope in `shared/report_schema.md`, including `site`, `audited_at`,
-`summary`, and `findings`.
+`summary`, and `findings`, plus coverage, readiness scoring, referral journey,
+evidence graph, ranked recommendations, and optional external corroboration.
 
 ## Safety
 This skill is read-only. It performs unauthenticated inspection, applies crawl

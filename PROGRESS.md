@@ -120,3 +120,19 @@ Completed:
 10. Added adaptive URL prioritization for homepage, product, pricing, service, contact, about, FAQ, documentation, and article paths.
 
 Validation after this pass: 107 pytest tests passed; Python sources compile successfully.
+
+## Final polishing pass — 2026-09-13
+
+Completed:
+- Added bounded opt-in independent external corroboration using only already-linked public HTML pages, with robots/private-host/social/tracker safeguards.
+- Added a five-stage AI Referral Journey with stage evidence and bottleneck identification.
+- Added transparent impact, effort, priority-score, and priority-rank metadata plus a top recommendations list.
+- Added an Evidence Graph with page/entity/price nodes, link relationships, visible commercial facts, and explicit structured-price conflict edges.
+- Added 12 adversarial polish tests covering journey gaps, evidence-graph conflicts, ranking behavior, identity extraction, and corroboration safety.
+- Added a public-site benchmark script for Adobe, Python, Wikipedia, and NASA with strict page/request/runtime budgets.
+- Added a static final-submission audit validating manifest structure, exactly one entrypoint, all SKILL.md files, README/progress/requirements, no embedded ZIP, and no obvious environment-secret files.
+- Expanded the README with architecture, competitive report layers, safety, setup, benchmark, and submission guidance.
+
+Validation after polishing: 119 pytest tests passed, 7 subtests passed, Python compilation succeeded, and the static final-submission audit passed 17/17 checks.
+
+Public-site benchmark note: this execution environment could not make outbound HTTP requests from the repository runtime, so the benchmark script recorded bounded network failures rather than fabricating results. Public reachability of the benchmark targets was independently verified through current web access.
