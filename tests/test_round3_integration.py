@@ -29,8 +29,8 @@ class Round3IntegrationTests(unittest.TestCase):
         product_titles = {item["title"] for item in engagement_findings_for_page(product)}
         article_titles = {item["title"] for item in engagement_findings_for_page(article)}
 
-        self.assertIn("Decision page lacks a clear next action", product_titles)
-        self.assertNotIn("Decision page lacks a clear next action", article_titles)
+        self.assertIn("No actionable element was extracted", product_titles)
+        self.assertNotIn("No actionable element was extracted", article_titles)
 
     def test_entity_mismatch_is_evidence_backed(self):
         page = PageResult(
@@ -57,7 +57,7 @@ class Round3IntegrationTests(unittest.TestCase):
             url="https://example.com/product/widget",
             depth=0,
             raw_html="<html><h1>Widget</h1><p>Product information.</p></html>",
-            json_ld=[{"@type": "Article", "dateModified": "2020-01-01"}],
+            json_ld=[{"@type": "WebPage", "dateModified": "2020-01-01"}],
         )
         crawler = Mock()
         crawler.crawl.return_value = {

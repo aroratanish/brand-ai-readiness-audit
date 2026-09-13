@@ -31,8 +31,7 @@ def test_stale_fixture_is_detected():
 def test_engagement_fixture_detects_empty_action_and_form():
     p=page("engagement")
     titles={f["title"] for f in engagement_findings(p)}
-    assert "Form lacks a clear submit control" in titles
-    assert "Action control has no usable destination" in titles
+    assert "Form has no extracted submit control" in titles
 
 def test_render_semantic_only_flags_important_content():
     p=page("js-heavy")

@@ -32,6 +32,7 @@ def _finding(
     why_it_matters: str,
     action_summary: str,
 ) -> dict[str, Any]:
+    page_url = _text(page.get("final_url") or page.get("url"))
     return {
         "id": check_id,
         "source_skill": SOURCE,
@@ -39,7 +40,7 @@ def _finding(
         "category": CATEGORY,
         "title": title,
         "severity": severity,
-        "evidence": evidence,
+        "evidence": f"Page: {page_url or '(unknown)'}. {evidence}",
         "why_it_matters": why_it_matters,
         "suggested_action": {
             "summary": action_summary,
@@ -119,6 +120,9 @@ def check_primary_cta(
     action evidence.
     """
 
+    if page.get("high_intent") is not True:
+        return None
+
     if _has_action_evidence(page):
         return None
 
@@ -145,43 +149,54 @@ def check_primary_cta(
 def check_cta_targets(
     page: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    """
-    EN-02.
-
-    PageResult does not contain per-target HTTP response statuses.
-    Therefore this check does not claim that a target returned 4xx/5xx.
-
-    It only reports directly observable empty or fragment-only hrefs.
-    """
-
+    """EN-02 — Reachability of an important action target when status is observed."""
     findings: list[dict[str, Any]] = []
 
     for index, link in enumerate(_links(page), start=1):
         href = _text(link.get("href"))
+        status = link.get("status_code")
 
-        if not _is_empty_href(href):
+        if _is_empty_href(href):
+            if page.get("high_intent") is True or link.get("role") == "button" or link.get("important") is True:
+                label = _label(link) or "(unlabelled link)"
+                findings.append(
+                    _finding(
+                        page,
+                        f"EN-02-{index}",
+                        "Important action link has no usable target",
+                        f"Link '{label}' uses an empty or fragment-only href ('{href or '(empty)'}').",
+                        "high",
+                        "The extracted action does not expose a concrete destination.",
+                        "Provide a valid destination or implement the control as a defined interaction with an accessible outcome.",
+                    )
+                )
+            continue
+
+        try:
+            status_code = int(status) if status not in (None, "") else None
+        except (TypeError, ValueError):
+            status_code = None
+
+        if status_code is None or status_code < 400:
+            continue
+
+        if page.get("high_intent") is not True and link.get("role") != "button" and link.get("important") is not True:
             continue
 
         label = _label(link) or "(unlabelled link)"
-
+        target = _text(link.get("absolute_url") or href) or "(empty)"
         findings.append(
             _finding(
                 page,
                 f"EN-02-{index}",
-                "Action link has no usable target",
+                "Important action target is unreachable",
                 (
-                    f"Link '{label}' has an empty or fragment-only href "
-                    f"('{href or '(empty)'}')."
+                    f"Link '{label}' targets '{target}' and the crawler observed "
+                    f"HTTP {status_code}."
                 ),
                 "high",
-                (
-                    "The extracted link does not expose a concrete "
-                    "destination for the action."
-                ),
-                (
-                    "Provide a valid destination or represent the control "
-                    "as an appropriate non-link interaction."
-                ),
+                "The observed action target cannot reliably continue the customer journey.",
+                "Repair the destination or replace the action with a verified reachable route.",
             )
         )
 
@@ -263,9 +278,14 @@ def check_value_proposition(
     EN-04.
 
     PageResult provides title, meta description, H1 and H2 evidence but
-    does not provide a semantic value_proposition field. This check therefore
-    evaluates only whether any direct page-level descriptive evidence exists.
+    does not provide a semantic value_proposition field. The check is therefore
+    limited to action-oriented pages, where page-level descriptive context is
+    relevant to the engagement journey. Missing descriptive metadata on an
+    otherwise unclassified/informational page remains UNKNOWN.
     """
+
+    if page.get("high_intent") is not True and page.get("core_service") is not True:
+        return None
 
     if _has_page_description(page):
         return None

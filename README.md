@@ -140,7 +140,7 @@ Run the full suite:
 PYTHONPATH=. python -m pytest
 ```
 
-The current suite covers **119 tests plus 7 subtests**, including adversarial
+The current suite covers **122 tests plus 7 subtests**, including adversarial
 false-positive cases and generalized fixture sites.
 
 Static final-submission audit:
