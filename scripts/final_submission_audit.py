@@ -13,7 +13,8 @@ def main():
     entry=[s for s in skills if s.get('entrypoint') is True]
     checks.append(("exactly one entrypoint", len(entry)==1))
     checks.append(("README exists", (ROOT/'README.md').is_file()))
-    checks.append(("PROGRESS exists", (ROOT/'PROGRESS.md').is_file()))
+    legacy = [ROOT/'PROGRESS.md', ROOT/'P1_ADAPTER_CHANGES.md'] + list(ROOT.rglob('SKILL_P3.md'))
+    checks.append(("no legacy development docs", not any(p.is_file() for p in legacy)))
     checks.append(("requirements exists", (ROOT/'requirements.txt').is_file()))
     for s in skills:
         folder=ROOT/s['path']; skill=folder/'SKILL.md'
