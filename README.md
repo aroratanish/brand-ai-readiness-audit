@@ -248,13 +248,3 @@ brand-ai-readiness-audit/
 
 The marketplace manifest has exactly one entrypoint and every listed skill has
 its own `SKILL.md`.
-=======
-PYTHONPATH=. .venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q
-```
-
-Current limitations: external corroboration, persistence, dashboards,
-authentication, and deployment infrastructure are intentionally out of scope.
-HTTP 4xx/5xx responses are retained as crawled `PageResult` entries with
-`success=False`, an HTTP error in `errors`, and normalized technical findings;
-redirects and other status codes below 400 remain successful.
->>>>>>> d0e427b (feat: finalize Adobe Round 3 skill marketplace)
